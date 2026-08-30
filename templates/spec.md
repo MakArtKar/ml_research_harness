@@ -15,7 +15,8 @@ diff:
     summary: ""
   config: {}            # keys changed vs parent's resolved config: {key: {from: X, to: Y}}
   data: {}              # changes vs parent; roots pin dataset/version/hash/splits here
-  evaluation: {}        # benchmark/metric changes vs parent; roots pin the full list here
+  evaluation: {}        # benchmark/metric + eval-setup changes (hardware, batch,
+                        # sampling params) vs parent; roots pin the full list here
 assertions:
   - id: example-assertion
     metric: val/loss

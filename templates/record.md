@@ -17,8 +17,13 @@ config:
 setup:                  # materialized for this run — not a diff
   model: ""
   data: ""              # dataset with version/hash and splits
-  benchmarks: []
-  hyperparameters: {}
+  training:
+    hardware: ""
+    hyperparameters: {} # batch_size, lr, schedule, steps/epochs, seed, ...
+  evaluation:
+    hardware: ""
+    benchmarks: []
+    params: {}          # batch_size, temperature, max_new_tokens, ...
 launch_command: ""
 artifacts:              # URIs only — heavy artifacts are never committed
   wandb: ""

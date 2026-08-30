@@ -30,6 +30,11 @@ human-readable at the same time. Follow them for every experiment.
   Iteration statuses cycle: `planned → running → completed → analyzed`, then
   either back to `planned` (verdict `revise`, iteration+1) or to a terminal
   status (`accepted` / `rejected` / `inconclusive`).
+- **Engineering changes** (`ENG-NNNN`) are code changes with **no hypothesis
+  about model quality**: instrumentation/metrics, refactoring,
+  infrastructure, bootstrap implementation. They never occupy the experiment
+  loop — they are documented in the engineering log and verified by the
+  reduced pipeline (experiment-process skill).
 
 ## Where
 
@@ -39,6 +44,10 @@ the field definitions below if templates are unavailable):
 ```
 experiments/
   registry.md                     # index: one row per experiment
+  engineering/
+    log.md                        # index: one row per engineering change
+    ENG-0007/
+      checks/                     # reduced-pipeline verdicts for that change
   EXP-0042-attn-dropout/
     spec.md                       # living plan (see experiment-planning skill)
     runs/
@@ -50,6 +59,7 @@ experiments/
     report.md                     # final synthesis, written at terminal verdict
 knowledge/
   findings.md                     # validated conclusions, linked to EXP ids
+  metrics.md                      # metric registry: every metric + its verification
   conventions.md                  # repo-specific facts (env, data paths, budgets)
 .harness/
   checkers/                       # generated checks — OFF-LIMITS to the implementer
@@ -74,6 +84,8 @@ Rules:
   iteration: `[EXP-0042.i3] fix attention mask`. Never squash or amend on the
   `exp/` branch while the loop runs — the commit trail is the record of how
   errors were fixed and the anchor for resuming an interrupted loop.
+- Engineering changes commit with their own prefix — `[ENG-0007] log
+  per-position acceptance length` — on `main` or a short-lived branch.
 - Docs (`experiments/…`, `knowledge/…`) are committed on the experiment
   branch during the loop. At a terminal verdict, docs always land on `main`
   (merge or cherry-pick) regardless of the code-merge decision, so history
@@ -114,7 +126,8 @@ Body: Idea, Motivation, Risks, Enrichment log.
 **`runs/iNN/record.md`** frontmatter: `experiment`, `iteration`, `commit`,
 `branch`, `dirty`, `env` (lockfile hash, python/torch/cuda, hardware),
 `config` (path + resolved hash), `setup` (materialized, not a diff: `model`,
-`data` with version/hash, `benchmarks`, `hyperparameters`), `launch_command`,
+`data` with version/hash, `training` — hardware + hyperparameters,
+`evaluation` — hardware + benchmarks + sampling params), `launch_command`,
 `artifacts` (wandb URL, checkpoint URIs, log paths), `metrics` (final
 numbers), `verdict` (iteration verdict). Body: Run notes, Incidents,
 Analysis (per-iteration; the cross-iteration synthesis belongs in the
@@ -127,6 +140,17 @@ report).
 
 **`registry.md`**: one table row per experiment — ID, slug, parent, status,
 iteration, headline metric, date.
+
+**`engineering/log.md`**: one table row per engineering change — ID, date,
+kind (`metrics` / `refactor` / `infra` / `bootstrap`), summary, commits,
+verification (check ids that passed). Verdicts live in
+`engineering/ENG-NNNN/checks/`.
+
+**`knowledge/metrics.md`**: the metric registry (schema:
+`metrics.schema.json`) — per metric: `name`, `kind`
+(`primary`/`proxy`/`diagnostic`), `definition`, `logged_by`, `added_by`,
+`verification` (type/phase/params), `references` (backfilled values with
+provenance). Maintained per the experiment-planning skill.
 
 ## When: status transitions
 
@@ -145,12 +169,34 @@ On `revise`: prepare the spec diff for approval (experiment-planning skill);
 on approval, bump `iteration` in the spec, set `planned`, create
 `runs/iNN+1/`.
 
+## Engineering changes
+
+When a change carries no hypothesis about model quality, document it as an
+engineering change instead of an experiment:
+
+1. Allocate `ENG-NNNN` by appending a row to `experiments/engineering/log.md`
+   (kind: `metrics` / `refactor` / `infra` / `bootstrap`).
+2. Commit with the `[ENG-NNNN]` prefix.
+3. Run the reduced verification pipeline (experiment-process skill); verdicts
+   go to `experiments/engineering/ENG-NNNN/checks/`. Mark the row's
+   Verification column only when the required checks pass.
+4. If the change adds or modifies a metric: update `knowledge/metrics.md`
+   (registry entry + verification mapping + backfilled references, per the
+   experiment-planning skill). A logged metric without a registry entry is an
+   audit failure.
+5. Result-neutral changes (refactors, pure instrumentation) must pass the
+   equivalence check — previously registered metrics unchanged on a
+   reference checkpoint.
+
 ## Scaffolding (first use in a repo)
 
-1. Create `experiments/registry.md` from the template.
-2. Create `knowledge/findings.md` (empty list) and `knowledge/conventions.md`,
-   filling conventions by inspecting the repo: environment and how it is
-   built, entry points, data locations, typical budgets, logging setup.
+1. Create `experiments/registry.md` and `experiments/engineering/log.md`
+   from the templates.
+2. Create `knowledge/findings.md` (empty list), `knowledge/metrics.md`
+   (register every metric the repo already logs, with kinds and verification
+   mappings), and `knowledge/conventions.md`, filling conventions by
+   inspecting the repo: environment and how it is built, entry points, data
+   locations, typical budgets, logging setup.
 3. Leave `.harness/checkers/` to the checker agent (experiment-process
    skill) — do not populate it while scaffolding.
 
@@ -161,3 +207,7 @@ the required-fields table for its current status; verify the registry row
 matches the spec frontmatter (status, iteration); verify artifact links in
 run records resolve; verify every `[EXP-NNNN.iN]` commit's iteration has a
 `runs/iNN/` directory.
+
+To audit instrumentation: every metric the code logs has an entry in
+`knowledge/metrics.md` with a verification mapping; every engineering-log
+row has its checks green; every `[ENG-NNNN]` commit has a log row.

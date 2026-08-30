@@ -1,6 +1,7 @@
 # V1 Design: Architecture, Use Cases, and Skills
 
-Status: agreed v1 scope. Last updated: 2026-08-31.
+Status: agreed v1 scope. Last updated: 2026-08-31 (added engineering changes
+and the metric registry).
 
 ## 1. What this project is
 
@@ -84,6 +85,39 @@ frontmatter (status + iteration), the registry row, and the last
 iteration-tagged commit (see 3.3). No separate state file — it would duplicate
 the source of truth.
 
+### Engineering changes
+
+Not every change is an experiment. A change with **no hypothesis about model
+quality** — adding metrics/instrumentation, refactoring, infrastructure, or
+the bootstrap implementation of the codebase itself — is an **engineering
+change** (`ENG-NNNN`): a row in `experiments/engineering/log.md`, commits
+prefixed `[ENG-NNNN]`, and a reduced verification pipeline (static checks,
+scope-vs-intent, smoke, and — for result-neutral changes — an equivalence
+check: previously registered metrics unchanged on a reference checkpoint).
+No spec, no loop. This also solves the from-scratch bootstrap: the initial
+implementation lands as engineering changes verified against the root
+experiment's spec, and the root experiment then pins the finished commit.
+
+### Metric registry — a metric is a verification
+
+Metrics are logged for a reason, and each reason implies a check. The
+registry `knowledge/metrics.md` records every logged metric with its kind
+and its verification mapping:
+
+| Kind | Purpose | Verification |
+|---|---|---|
+| `primary` | measures experiment quality (headline) | phase-4 assertion vs `compare_to` |
+| `proxy` | correlates with primary; localizes what to improve | advisory check feeding analysis and anomaly triggers |
+| `diagnostic` | training health (grad norm, loss by position, latent std, perf) | phase-3 watchdog band or analysis-only |
+
+The checker agent derives metric-backed checks from registry entries, so
+"log a new metric" literally means "prepare a new verification". Adding a
+metric is an engineering change with extra obligations: registry entry,
+generated checker, and **backfill** — the metric is measured on the current
+reference checkpoint(s) via an eval-only run and the values stored in the
+entry's `references` with provenance. Run records stay immutable; backfilled
+numbers live in the registry, and assertions may ground in either.
+
 ### Living spec
 
 The spec starts as a change proposal and is **enriched by the loop**. Reasons
@@ -153,12 +187,15 @@ ml_research_harness/
 │   ├── spec.schema.json      # frontmatter of spec.md
 │   ├── record.schema.json    # frontmatter of a run record
 │   ├── report.schema.json    # frontmatter of report.md
+│   ├── metrics.schema.json   # frontmatter of the metric registry
 │   └── verdict.schema.json   # check verdict format
 └── templates/
     ├── spec.md
     ├── record.md
     ├── report.md
-    └── registry.md
+    ├── registry.md
+    ├── metrics.md
+    └── engineering-log.md
 ```
 
 ### 3.2 Target repo layout (created and maintained by the skills)
@@ -167,6 +204,10 @@ ml_research_harness/
 <target-repo>/
 ├── experiments/
 │   ├── registry.md                 # index: one row per experiment
+│   ├── engineering/
+│   │   ├── log.md                  # index: one row per engineering change
+│   │   └── ENG-0007/
+│   │       └── checks/             # reduced-pipeline verdicts
 │   └── EXP-0042-attn-dropout/
 │       ├── spec.md                 # living plan, enriched each iteration
 │       ├── runs/
@@ -178,6 +219,7 @@ ml_research_harness/
 │       └── report.md               # final synthesis: analysis, conclusions, verdict
 ├── knowledge/
 │   ├── findings.md                 # validated conclusions, linked to EXP ids
+│   ├── metrics.md                  # metric registry: every metric + its verification
 │   └── conventions.md              # repo-specific facts (env, data, budgets)
 └── .harness/
     └── checkers/                   # generated deterministic checks (see 4.3)
@@ -228,9 +270,11 @@ commit conventions as in 3.3.
 | File | Fields |
 |---|---|
 | `spec.md` | id, slug, parent, compare_to, status, iteration, hypothesis, generalized diff (code scope allowlist + config diff + data + evaluation), assertions (expected metric behavior with thresholds vs compare_to), budgets (time, memory, steps/sec), expected artifact manifest, assumptions; *body*: idea, motivation, risks, enrichment log |
-| `runs/iNN/record.md` | iteration, commit hash, branch, dirty flag, env snapshot (deps lockfile hash, torch/CUDA), resolved config snapshot (or its path + hash), model, data, benchmarks, hyperparameters, launch command, artifact links (wandb URL, checkpoint URIs, log paths), final metrics, iteration verdict; *body*: run notes, incidents, per-iteration analysis |
+| `runs/iNN/record.md` | iteration, commit hash, branch, dirty flag, env snapshot (deps lockfile hash, torch/CUDA), resolved config snapshot (or its path + hash), setup split into model, data, training (hardware + hyperparameters) and evaluation (hardware + benchmarks + sampling params), launch command, artifact links (wandb URL, checkpoint URIs, log paths), final metrics, iteration verdict; *body*: run notes, incidents, per-iteration analysis |
 | `report.md` | verdict (accepted / rejected / inconclusive), headline metric deltas vs compare_to, iterations count, knowledge-merge summary, merge-to-main decision; *body*: final analysis, conclusions, follow-up ideas |
 | `registry.md` | one row per experiment: id, slug, parent, status, iteration, headline metric, date |
+| `engineering/log.md` | one row per engineering change: id, date, kind (metrics/refactor/infra/bootstrap), summary, commits, verification |
+| `knowledge/metrics.md` | metric registry: per metric — name, kind (primary/proxy/diagnostic), definition, logged_by, added_by, verification mapping, backfilled references |
 
 **How.** Dual format per section 2: YAML frontmatter validated against
 `schemas/`, narrative in the body. Mutability is explicit: `spec.md` is a
@@ -307,6 +351,13 @@ config-only diffs (there the config *is* the diff). A full-length ablation
 run is never automatic — only on explicit request (e.g. before claiming a
 result in a paper).
 
+**Engineering pipeline.** Engineering changes skip the loop and run a
+reduced pipeline: `e/static`, `e/scope` (files vs declared intent),
+`e/smoke`, `e/equivalence` (result-neutral changes: previously registered
+metrics unchanged at a reference checkpoint), and for metric changes
+`e/metric-known-value` + `e/metric-registered`. Verdicts land in
+`experiments/engineering/ENG-NNNN/checks/`.
+
 Cross-cutting rules baked into the skill:
 
 - **Verdict format**: every check emits
@@ -362,11 +413,27 @@ frontmatter (status + iteration), finds the last `[EXP-NNNN.iN]` commit and
 the current iteration's `runs/iNN/` contents, and continues from the first
 incomplete step of that iteration's cycle.
 
+**S8 — Add a metric.** User: "log acceptance length per block position".
+Agent opens an engineering change (`ENG-NNNN`), implements the logging, adds
+the registry entry (kind, definition, verification mapping), passes the
+reduced pipeline including known-value and equivalence checks, has the
+checker agent generate the metric's check, and backfills reference values on
+the current reference checkpoint. The new metric is now assertable by future
+specs.
+
+**S9 — Bootstrap a repo from scratch.** The root experiment's spec is
+written first and doubles as the implementation contract; the codebase is
+then built as a series of engineering changes (`bootstrap` kind) verified by
+the reduced pipeline; finally the root experiment pins the finished commit
+and runs phases 2–4 (S2).
+
 ## 6. V1 scope
 
 **In:**
 
-- The three skills, with schemas and templates.
+- The three skills, with schemas and templates — including engineering
+  changes (`ENG`), the metric registry with per-metric verifications, and
+  backfill rules.
 - Checker catalog as a reference document; skills able to generate phase 0–2
   deterministic checkers for a concrete repo (phases 3–4 may start as
   documented procedures rather than generated code).

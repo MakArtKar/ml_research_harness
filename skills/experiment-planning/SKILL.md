@@ -17,18 +17,24 @@ verify against. The spec is the contract: verification (experiment-process
 skill) checks the implementation and the run against it, and any decision the
 spec does not dictate must eventually be folded back into it.
 
-## New experiment or new iteration?
+## New experiment, new iteration, or engineering change?
 
 Before planning, decide which you are doing:
 
+- The change carries **no hypothesis about model quality** —
+  instrumentation/metrics, refactoring, infrastructure, bootstrap
+  implementation → an **engineering change** (`ENG-NNNN`), not an experiment:
+  engineering log + reduced pipeline (experiment-logging and
+  experiment-process skills), no spec, no loop.
 - The hypothesis or the declared diff scope **changes substantively** → a
   **new experiment** (new `EXP-NNNN`, new spec, parent set appropriately).
 - The implementation is being **fixed**, or the spec is being **enriched
   with details** → a **new iteration** of the same experiment (spec diff
   through the approval gate, iteration+1).
 
-When in doubt: if the new work would invalidate comparisons against the
-experiment's own earlier iterations, it is a new experiment.
+When in doubt between experiment and iteration: if the new work would
+invalidate comparisons against the experiment's own earlier iterations, it
+is a new experiment.
 
 ## Writing the initial spec
 
@@ -53,10 +59,13 @@ experiment-logging skill) following these rules:
    - `evaluation`: benchmark and metric-definition changes vs parent.
    - Root experiments pin `data` and `evaluation` absolutely and record the
      full training config; their diff may otherwise be empty.
-3. **Grounded assertions.** Every threshold traces to a real number in a
-   `compare_to` record, cited via `source`. Never invent absolute targets.
-   Include non-regression assertions (throughput, memory, secondary metrics)
-   alongside the headline claim.
+3. **Grounded assertions.** Every threshold traces to a real number — in a
+   `compare_to` record, or in the metric registry's `references`
+   (`knowledge/metrics.md`) for metrics backfilled after the reference run —
+   cited via `source`. Never invent absolute targets. Include non-regression
+   assertions (throughput, memory, secondary metrics) alongside the headline
+   claim. Prefer asserting on `primary` metrics; use `proxy` metrics for
+   analysis, not for accept/reject decisions.
 4. **Decision rule covering every outcome**: what result means `accept`,
    `reject`, `inconclusive`, and what failure modes mean `revise` — plus
    **early-kill thresholds** the training watchdog enforces (e.g. "kill if
@@ -114,6 +123,32 @@ Rules:
 
 If the executor disagrees with a verifier about what the spec should say,
 that is always a human escalation — never silently resolved by either agent.
+
+## Registering a new metric
+
+Logging a new metric is **preparing a new verification** — a metric is
+logged either to measure experiment quality, to localize what to improve, or
+to watch training health, and each of those purposes implies a check.
+Adding or changing a metric is an engineering change (`ENG-NNNN`) with these
+extra obligations:
+
+1. **Registry entry** in `knowledge/metrics.md`: `name`, `kind`, precise
+   `definition`, `logged_by`, `added_by`, and a `verification` mapping.
+   Defaults by kind:
+   - `primary` (measures experiment quality) → phase-4 **assertion** vs
+     `compare_to`;
+   - `proxy` (correlates with primary, localizes improvements) →
+     **advisory** check feeding analysis and anomaly triggers;
+   - `diagnostic` (training health: grad norm, loss by position, latent
+     std, perf) → phase-3 **band** or `analysis-only`.
+2. **Checker generation**: the checker agent derives the metric's check from
+   the registry entry (never from the executor's description).
+3. **Backfill**: measure the metric on the current reference checkpoint(s)
+   with an eval-only run and write the values into the entry's `references`
+   with provenance (experiment, checkpoint, measuring commit, date). Run
+   records are immutable — backfilled numbers live in the registry, never
+   patched into old records. If backfill is infeasible (metric requires
+   training-time state), record an explicit waiver in the entry instead.
 
 ## Merging into knowledge (terminal verdict)
 

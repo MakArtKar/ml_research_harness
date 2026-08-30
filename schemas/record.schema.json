@@ -48,20 +48,23 @@
       }
     },
     "setup": {
-      "description": "Materialized setup for this run (not a diff): model, data, benchmarks, hyperparameters.",
+      "description": "Materialized setup for this run (not a diff), split into training and evaluation.",
       "type": "object",
-      "required": ["model", "data", "benchmarks", "hyperparameters"],
+      "required": ["model", "data", "training", "evaluation"],
       "properties": {
         "model": { "type": "string" },
         "data": {
           "description": "Dataset with version/hash and splits, as a string or structured object.",
           "type": ["string", "object"]
         },
-        "benchmarks": {
-          "type": "array",
-          "items": { "type": "string" }
+        "training": {
+          "description": "Training setup: hardware, batch size, lr, schedule, steps/epochs, seed, other hyperparameters.",
+          "type": "object"
         },
-        "hyperparameters": { "type": "object" }
+        "evaluation": {
+          "description": "Evaluation setup: hardware, batch size, sampling parameters (e.g. temperature), benchmarks list.",
+          "type": "object"
+        }
       }
     },
     "launch_command": { "type": "string" },

@@ -47,8 +47,10 @@ in minutes before burning a full run.
   (otherwise it optimizes for passing checks, not for correctness).
 - **Checker agent** — a separate agent (fresh context) that generates and
   maintains the deterministic checkers in `.harness/checkers/`, tailored to
-  this repo, guided by `references/checker-catalog.md`. Checkers are
-  versioned as code; any checker diff itself goes through intent review.
+  this repo, guided by `references/checker-catalog.md`. Metric-backed checks
+  (phase-3 bands, phase-4 assertion inputs) are derived from the metric
+  registry `knowledge/metrics.md`, never invented. Checkers are versioned as
+  code; any checker diff itself goes through intent review.
 - **Reviewers / diagnosticians** — isolated-context agents for spec review,
   code review, intent diff, failure diagnosis, and results review. Each gets
   only the inputs named for its check in the catalog, never the executor's
@@ -110,6 +112,24 @@ After phase 4, set exactly one verdict in the iteration's record:
 On any terminal verdict: write `report.md`, merge conclusions into
 `knowledge/` (experiment-planning skill), update the registry row, land docs
 on `main`, decide the code merge.
+
+## Engineering pipeline (no loop)
+
+Engineering changes (`ENG-NNNN` — no hypothesis about model quality; see the
+experiment-planning boundary rule) skip the experiment loop and run a
+reduced pipeline. Verdicts use the same JSON format and land in
+`experiments/engineering/ENG-NNNN/checks/`:
+
+| Id | Check | Applies to |
+|---|---|---|
+| `e/static` | lint, typecheck, unit tests | all |
+| `e/scope` | files touched match the change's declared intent | all |
+| `e/smoke` | training smoke run completes | all |
+| `e/equivalence` | re-run smoke/eval at a reference checkpoint: previously registered metrics unchanged within tolerance | result-neutral changes (refactors, pure instrumentation) |
+| `e/metric-known-value` | unit check of the metric on inputs with a known value | new/changed metrics |
+| `e/metric-registered` | registry entry exists in `knowledge/metrics.md`, its checker is generated, references backfilled or waived | new/changed metrics |
+
+Mark the engineering-log row verified only when all applicable checks pass.
 
 ## Resuming an interrupted loop
 
