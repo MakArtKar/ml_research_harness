@@ -1,0 +1,67 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "report.schema.json",
+  "title": "Experiment report frontmatter",
+  "description": "Validates the YAML frontmatter of experiments/EXP-NNNN-slug/report.md. Written once, at the terminal verdict.",
+  "type": "object",
+  "required": [
+    "experiment",
+    "verdict",
+    "iterations",
+    "deltas",
+    "knowledge_merge",
+    "merge_to_main"
+  ],
+  "properties": {
+    "experiment": {
+      "type": "string",
+      "pattern": "^EXP-[0-9]{4,}$"
+    },
+    "verdict": {
+      "enum": ["accepted", "rejected", "inconclusive"]
+    },
+    "iterations": {
+      "description": "Total number of loop iterations the experiment took.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "deltas": {
+      "description": "Headline metric deltas vs compare_to experiments.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["metric", "vs", "reference", "value", "delta"],
+        "properties": {
+          "metric": { "type": "string" },
+          "vs": { "type": "string", "pattern": "^EXP-[0-9]{4,}$" },
+          "reference": { "type": "number" },
+          "value": { "type": "number" },
+          "delta": { "type": "number" }
+        }
+      }
+    },
+    "knowledge_merge": {
+      "description": "What was merged into knowledge/ on this verdict.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["file", "summary"],
+        "properties": {
+          "file": { "type": "string" },
+          "summary": { "type": "string" }
+        }
+      }
+    },
+    "merge_to_main": {
+      "description": "Whether the experiment's code becomes the new default on main.",
+      "type": "boolean"
+    },
+    "merge_commit": {
+      "description": "Merge commit on main, if merge_to_main is true. Squash mappings are recorded in the body.",
+      "oneOf": [
+        { "type": "string", "pattern": "^[0-9a-f]{7,40}$" },
+        { "type": "null" }
+      ]
+    }
+  }
+}

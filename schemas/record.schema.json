@@ -1,0 +1,86 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "record.schema.json",
+  "title": "Run record frontmatter",
+  "description": "Validates the YAML frontmatter of experiments/EXP-NNNN-slug/runs/iNN/record.md. Immutable once the iteration ends.",
+  "type": "object",
+  "required": [
+    "experiment",
+    "iteration",
+    "commit",
+    "branch",
+    "dirty",
+    "env",
+    "config",
+    "setup",
+    "launch_command",
+    "artifacts"
+  ],
+  "properties": {
+    "experiment": {
+      "type": "string",
+      "pattern": "^EXP-[0-9]{4,}$"
+    },
+    "iteration": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "commit": {
+      "description": "Exact commit hash the run used.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{7,40}$"
+    },
+    "branch": { "type": "string" },
+    "dirty": {
+      "description": "True if the working tree was dirty at launch. Dirty runs are flagged by verification.",
+      "type": "boolean"
+    },
+    "env": {
+      "description": "Environment snapshot. Suggested keys: lockfile_hash, python, torch, cuda, hardware.",
+      "type": "object"
+    },
+    "config": {
+      "description": "Resolved config: path in the repo plus a hash of the resolved config, or the config inlined.",
+      "type": "object",
+      "properties": {
+        "path": { "type": "string" },
+        "resolved_hash": { "type": "string" }
+      }
+    },
+    "setup": {
+      "description": "Materialized setup for this run (not a diff): model, data, benchmarks, hyperparameters.",
+      "type": "object",
+      "required": ["model", "data", "benchmarks", "hyperparameters"],
+      "properties": {
+        "model": { "type": "string" },
+        "data": {
+          "description": "Dataset with version/hash and splits, as a string or structured object.",
+          "type": ["string", "object"]
+        },
+        "benchmarks": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "hyperparameters": { "type": "object" }
+      }
+    },
+    "launch_command": { "type": "string" },
+    "artifacts": {
+      "description": "URIs to external stores (wandb URL, checkpoint URIs, log paths). Heavy artifacts are never committed.",
+      "type": "object"
+    },
+    "metrics": {
+      "description": "Final numbers. Required by the time status becomes `completed`.",
+      "type": "object"
+    },
+    "verdict": {
+      "description": "Iteration verdict, set at `analyzed`. `revise` re-enters the loop via the spec-diff approval gate.",
+      "oneOf": [
+        {
+          "enum": ["accept", "revise", "reject", "inconclusive", "escalate-to-human"]
+        },
+        { "type": "null" }
+      ]
+    }
+  }
+}

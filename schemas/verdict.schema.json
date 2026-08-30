@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "verdict.schema.json",
+  "title": "Check verdict",
+  "description": "Validates a single verification-check verdict JSON file in experiments/EXP-NNNN-slug/runs/iNN/checks/. Produced by deterministic checkers and AI reviewers; consumed by the agent loop.",
+  "type": "object",
+  "required": ["id", "phase", "verdict", "severity", "evidence"],
+  "properties": {
+    "id": {
+      "description": "Stable checker id, e.g. \"p2/single-batch-overfit\" (see the checker catalog).",
+      "type": "string"
+    },
+    "phase": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4
+    },
+    "verdict": {
+      "enum": ["pass", "fail", "skip"]
+    },
+    "severity": {
+      "description": "How a failure gates the loop: critical blocks, warning is advisory, info is context.",
+      "enum": ["info", "warning", "critical"]
+    },
+    "evidence": {
+      "description": "Why the verdict holds: numbers, log excerpts, file paths. Read by the AI diagnostician on failure.",
+      "type": ["string", "object"]
+    },
+    "checker": {
+      "enum": ["deterministic", "ai"]
+    },
+    "timestamp": {
+      "description": "ISO 8601.",
+      "type": "string"
+    }
+  }
+}

@@ -1,0 +1,144 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "spec.schema.json",
+  "title": "Experiment spec frontmatter",
+  "description": "Validates the YAML frontmatter of experiments/EXP-NNNN-slug/spec.md (after YAML-to-JSON conversion).",
+  "type": "object",
+  "required": [
+    "id",
+    "slug",
+    "parent",
+    "compare_to",
+    "status",
+    "iteration",
+    "hypothesis",
+    "diff",
+    "assertions",
+    "budgets",
+    "artifacts_expected",
+    "decision_rule",
+    "assumptions"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^EXP-[0-9]{4,}$"
+    },
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "parent": {
+      "description": "Experiment this one derives from; null for a root experiment.",
+      "oneOf": [
+        { "type": "string", "pattern": "^EXP-[0-9]{4,}$" },
+        { "type": "null" }
+      ]
+    },
+    "compare_to": {
+      "description": "Experiments whose recorded numbers ground the assertions (the runs to beat). Defaults to [parent] when non-empty parent exists.",
+      "type": "array",
+      "items": { "type": "string", "pattern": "^EXP-[0-9]{4,}$" }
+    },
+    "status": {
+      "enum": [
+        "planned",
+        "running",
+        "completed",
+        "analyzed",
+        "accepted",
+        "rejected",
+        "inconclusive"
+      ]
+    },
+    "iteration": {
+      "description": "Current iteration of the agent loop, starting at 1.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "hypothesis": {
+      "description": "One falsifiable claim with a concrete expected effect.",
+      "type": "string",
+      "minLength": 1
+    },
+    "diff": {
+      "description": "Generalized diff vs the parent. Root experiments pin data and evaluation absolutely instead of as a diff.",
+      "type": "object",
+      "required": ["code", "config", "data", "evaluation"],
+      "properties": {
+        "code": {
+          "type": "object",
+          "required": ["scope", "summary"],
+          "properties": {
+            "scope": {
+              "description": "File allowlist the implementation may touch. Must never include experiments/, knowledge/, or .harness/checkers/.",
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "summary": { "type": "string" }
+          }
+        },
+        "config": {
+          "description": "Config keys changed vs the parent's resolved config, e.g. {\"model.attn_dropout\": {\"from\": null, \"to\": 0.1}}.",
+          "type": "object"
+        },
+        "data": {
+          "description": "Dataset/version/hash/split changes vs parent; full pinning for roots.",
+          "type": "object"
+        },
+        "evaluation": {
+          "description": "Benchmark and metric-definition changes vs parent; full list for roots.",
+          "type": "object"
+        }
+      }
+    },
+    "assertions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "metric", "condition"],
+        "properties": {
+          "id": { "type": "string" },
+          "metric": { "type": "string" },
+          "at": {
+            "description": "When the assertion is evaluated, e.g. \"step 10000\" or \"end of training\".",
+            "type": "string"
+          },
+          "condition": {
+            "description": "Threshold grounded in a real number from a compare_to record, e.g. \"<= 2.29\".",
+            "type": "string"
+          },
+          "source": {
+            "description": "Experiment id the reference number comes from.",
+            "type": "string",
+            "pattern": "^EXP-[0-9]{4,}$"
+          }
+        }
+      }
+    },
+    "budgets": {
+      "description": "Resource bounds, e.g. wall_clock_hours, gpu_memory_gb, min_steps_per_sec.",
+      "type": "object"
+    },
+    "artifacts_expected": {
+      "description": "Manifest of artifacts the run must produce.",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "decision_rule": {
+      "description": "What result means accept / reject / inconclusive / revise, including early-kill thresholds.",
+      "type": "string",
+      "minLength": 1
+    },
+    "assumptions": {
+      "description": "Obvious-but-real off-spec decisions logged during iterations for human review.",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "seeds": {
+      "description": "Reserved for multi-seed support (post-v1).",
+      "type": "array",
+      "items": { "type": "integer" }
+    }
+  }
+}
