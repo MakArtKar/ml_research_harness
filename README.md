@@ -40,15 +40,18 @@ hypothesis to validated knowledge.
 - **Verifications are first-class.** The registry
   (`knowledge/verifications.md`) lists every verification: deterministic
   scripts, AI-review checkers, and metric observations — a metric plus how
-  to read it, as `primary` (headline quality → assertions), `proxy`
-  (localizes what to improve → advisory), or `diagnostic` (training health
-  → watchdog bands). Checkers are derived from the registry. Implementing a
-  verifier (a metric, a script, an AI checker) is a **verifier change**
-  (`VER-NNNN`) that uses the same spec-and-loop machinery as an experiment,
-  with calibration (must fail known-bad cases), equivalence (must not alter
-  training), and reference backfill on frozen checkpoints in place of a
-  training run. Verifications gate the loop *and* drive analysis: a revealed
-  problem seeds a follow-up experiment.
+  to read it, as `quality` (assertable measures of quality/performance) or
+  `diagnostic` (training health → watchdog bands). Which quality metric is
+  an experiment's **primary** — the one its success is judged by — is
+  declared per experiment in the spec (`primary_metric`), never fixed
+  globally; the rest serve as that experiment's proxies. Checkers are
+  derived from the registry. Implementing a verifier (a metric, a script, an
+  AI checker) is a **verifier change** (`VER-NNNN`) that uses the same
+  spec-and-loop machinery as an experiment, with calibration (must fail
+  known-bad cases), equivalence (must not alter training), and reference
+  backfill on frozen checkpoints in place of a training run. Verifications
+  gate the loop *and* drive analysis: a revealed problem seeds a follow-up
+  experiment.
 - **Checker isolation.** Deterministic checkers are generated per target
   repo by a *different* agent than the one implementing the experiment, live
   outside the implementer's allowed scope, and verifier prompts are never

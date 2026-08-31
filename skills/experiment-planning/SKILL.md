@@ -59,7 +59,15 @@ experiment-logging skill) following these rules:
 1. **Falsifiable hypothesis.** One claim with a concrete expected effect:
    "attention dropout 0.1 reduces val loss by ≥0.02 at step 10k vs
    EXP-0007" — not "dropout should help".
-2. **Generalized diff — specify every axis**, not just code:
+2. **Per-experiment primary metric.** `primary_metric` names the metric this
+   experiment's success is judged by — its delta vs `compare_to` is the
+   headline result. Different experiments optimize different things
+   (acceptance length, TPF, tokens per second), so the primary is chosen
+   here, per experiment — never fixed globally in the registry. It must have
+   a `metric-observation` entry in `knowledge/verifications.md`. For this
+   experiment, other `quality` metrics act as proxies (analysis, not
+   accept/reject); `diagnostic` metrics feed watchdog bands.
+3. **Generalized diff — specify every axis**, not just code:
    - `code`: file allowlist (`scope`) + a one-paragraph summary of the
      change. The allowlist must never include `experiments/`, `knowledge/`,
      or `.harness/checkers/`.
@@ -70,21 +78,21 @@ experiment-logging skill) following these rules:
    - `evaluation`: benchmark and metric-definition changes vs parent.
    - Root experiments pin `data` and `evaluation` absolutely and record the
      full training config; their diff may otherwise be empty.
-3. **Grounded assertions.** Every threshold traces to a real number — in a
+4. **Grounded assertions.** Every threshold traces to a real number — in a
    `compare_to` record, or in the verification registry's `references`
    (`knowledge/verifications.md`) for metrics backfilled after the reference
-   run — cited via `source`. Never invent absolute targets. Include
-   non-regression assertions (throughput, memory, secondary metrics)
-   alongside the headline claim. Prefer asserting on `primary` metrics; use
-   `proxy` metrics for analysis, not for accept/reject decisions.
-4. **Decision rule covering every outcome**: what result means `accept`,
-   `reject`, `inconclusive`, and what failure modes mean `revise` — plus
-   **early-kill thresholds** the training watchdog enforces (e.g. "kill if
-   val loss worse than reference by 0.05 at checkpoint 5k").
-5. **Budgets**: wall-clock, GPU memory, minimum throughput.
-6. **Expected artifacts manifest**: everything the run must produce
+   run — cited via `source`. Never invent absolute targets. The headline
+   assertion is on the `primary_metric`; include non-regression assertions
+   (throughput, memory, secondary metrics) alongside it.
+5. **Decision rule covering every outcome**, stated in terms of the
+   `primary_metric`: what result means `accept`, `reject`, `inconclusive`,
+   and what failure modes mean `revise` — plus **early-kill thresholds** the
+   training watchdog enforces (e.g. "kill if val loss worse than reference
+   by 0.05 at checkpoint 5k").
+6. **Budgets**: wall-clock, GPU memory, minimum throughput.
+7. **Expected artifacts manifest**: everything the run must produce
    (metrics file, checkpoints, wandb run, plots).
-7. **Knowledge merge plan** (in the body): which `knowledge/` files this
+8. **Knowledge merge plan** (in the body): which `knowledge/` files this
    experiment may update on acceptance, so the merge is decided before the
    result exists.
 
@@ -96,6 +104,8 @@ seen the planning conversation) review the spec:
 - Is the hypothesis falsifiable and the effect size stated?
 - Is every assertion measurable, with thresholds traceable to cited records?
 - Is the scope minimal for the hypothesis — no opportunistic extras?
+- Is the `primary_metric` declared, registered, and does the decision rule
+  speak in its terms?
 - Does the decision rule cover accept, reject, inconclusive, revise, and
   early-kill?
 - Are budgets and the artifact manifest present and realistic?
@@ -147,10 +157,11 @@ spec follows all the rules above, plus the `verifier` frontmatter block:
    a failure suggests — a fix in the current experiment, or a follow-up
    experiment.
 2. **Type**: `deterministic-script`, `metric-observation`, or `ai-review`.
-   For metric observation, declare the metric's `kind` with its default
-   verification: `primary` → phase-4 assertion vs `compare_to`; `proxy` →
-   advisory check feeding analysis; `diagnostic` → phase-3 band or
-   analysis-only.
+   For metric observation, declare the metric's `kind`: `quality`
+   (assertable in phase 4 and advisory for analysis — whether it serves as a
+   given experiment's primary or a proxy is chosen in *that experiment's*
+   spec via `primary_metric`, never here) or `diagnostic` (training health →
+   phase-3 band or analysis-only).
 3. **Calibration cases** (`verifier.calibration`): at least one known-good
    case the finished verifier must pass and one known-bad case it must fail
    (a planted bug, shuffled labels, an analytically known metric value).

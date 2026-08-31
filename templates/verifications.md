@@ -20,7 +20,8 @@ verifications:
     params: {}
     metric:
       name: val/example_metric
-      kind: primary        # primary | proxy | diagnostic
+      kind: quality        # quality | diagnostic — primary/proxy roles are
+                           # per-experiment (spec.primary_metric), not fixed here
       definition: ""
       logged_by: ""
     implemented_by: VER-NNNN

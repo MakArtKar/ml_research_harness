@@ -112,9 +112,15 @@ observations — the metric itself with its kind:
 
 | Metric kind | Purpose | Default verification |
 |---|---|---|
-| `primary` | measures experiment quality (headline) | phase-4 assertion vs `compare_to` |
-| `proxy` | correlates with primary; localizes what to improve | advisory check feeding analysis and anomaly triggers |
-| `diagnostic` | training health (grad norm, loss by position, latent std, perf) | phase-3 watchdog band or analysis-only |
+| `quality` | measures an aspect of experiment quality or performance (acceptance length, TPF, tokens per second) | assertable in phase 4; advisory for analysis |
+| `diagnostic` | training health (grad norm, loss by position, latent std, perf internals) | phase-3 watchdog band or analysis-only |
+
+**The primary metric is chosen per experiment, never fixed globally.** Each
+experiment's spec declares `primary_metric` — the metric its success is
+judged by (acceptance length for one experiment, tokens per second for
+another); the headline assertion and the decision rule are stated in its
+terms, and the other `quality` metrics act as that experiment's proxies
+(analysis, not accept/reject).
 
 The checker agent derives all checks from registry entries, so "log a new
 metric" literally means "implement a new verification". Verifications serve
@@ -281,11 +287,11 @@ commit conventions as in 3.3.
 
 | File | Fields |
 |---|---|
-| `spec.md` | id, slug, parent, compare_to, status, iteration, hypothesis, generalized diff (code scope allowlist + config diff + data + evaluation), assertions (expected metric behavior with thresholds vs compare_to), budgets (time, memory, steps/sec), expected artifact manifest, assumptions; *body*: idea, motivation, risks, enrichment log |
+| `spec.md` | id, slug, parent, compare_to, status, iteration, hypothesis, primary_metric (EXP only: the metric success is judged by), generalized diff (code scope allowlist + config diff + data + evaluation), assertions (expected metric behavior with thresholds vs compare_to), budgets (time, memory, steps/sec), expected artifact manifest, assumptions; *body*: idea, motivation, risks, enrichment log |
 | `runs/iNN/record.md` | iteration, commit hash, branch, dirty flag, env snapshot (deps lockfile hash, torch/CUDA), resolved config snapshot (or its path + hash), setup split into model, data, training (hardware + hyperparameters) and evaluation (hardware + benchmarks + sampling params), launch command, artifact links (wandb URL, checkpoint URIs, log paths), final metrics, iteration verdict; *body*: run notes, incidents, per-iteration analysis |
 | `report.md` | verdict (accepted / rejected / inconclusive), headline metric deltas vs compare_to, iterations count, knowledge-merge summary, merge-to-main decision; *body*: final analysis, conclusions, follow-up ideas |
 | `registry.md` | one row per change (EXP and VER): id, slug, type, parent, status, iteration, headline metric, date |
-| `knowledge/verifications.md` | verification registry: per verification — id, type (deterministic-script/metric-observation/ai-review), verifies, phase, gating, params, metric (name + kind primary/proxy/diagnostic + definition), implemented_by, backfilled references |
+| `knowledge/verifications.md` | verification registry: per verification — id, type (deterministic-script/metric-observation/ai-review), verifies, phase, gating, params, metric (name + kind quality/diagnostic + definition), implemented_by, backfilled references |
 
 **How.** Dual format per section 2: YAML frontmatter validated against
 `schemas/`, narrative in the body. Mutability is explicit: `spec.md` is a
@@ -312,6 +318,9 @@ How to produce and maintain a good `spec.md`.
 
 - **Falsifiable hypothesis**: a claim with a concrete expected effect, not
   "should improve things".
+- **Per-experiment primary metric**: `primary_metric` names the metric this
+  experiment's success is judged by; the headline assertion and decision
+  rule are stated in its terms.
 - **Full setup specification**: the generalized diff covers code scope,
   config (model size, batch size, hyperparameters as a diff to the parent's
   resolved config), data (version/hash, splits), and evaluation (benchmarks,

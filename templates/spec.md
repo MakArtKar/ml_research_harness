@@ -9,6 +9,9 @@ iteration: 1
 hypothesis: >
   One falsifiable claim with a concrete expected effect, not "should improve
   things".
+primary_metric: ""      # EXP only: the metric success is judged by — its delta
+                        # vs compare_to is the headline result (chosen per
+                        # experiment; must exist in knowledge/verifications.md)
 diff:
   code:
     scope: []           # file allowlist the implementation may touch

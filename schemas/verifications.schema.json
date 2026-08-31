@@ -47,8 +47,8 @@
                 "type": "string"
               },
               "kind": {
-                "description": "primary = measures experiment quality (headline); proxy = correlates with primary, localizes what to improve; diagnostic = training health.",
-                "enum": ["primary", "proxy", "diagnostic"]
+                "description": "quality = measures an aspect of experiment quality or performance (acceptance length, TPF, tokens per second) and can serve as an experiment's primary or proxy metric — which role it plays is chosen per experiment via the spec's primary_metric, never fixed globally; diagnostic = training health (grad norm, loss by position, latent std).",
+                "enum": ["quality", "diagnostic"]
               },
               "definition": {
                 "description": "What the metric computes, precisely enough to reimplement.",

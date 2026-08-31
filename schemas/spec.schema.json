@@ -61,6 +61,11 @@
       "type": "string",
       "minLength": 1
     },
+    "primary_metric": {
+      "description": "The metric this experiment's success is judged by — its delta vs compare_to is the headline result (e.g. val/greedy_accepted_length for a quality experiment, perf/tokens_per_second for a performance one). Chosen per experiment, never fixed globally. Must have a metric-observation entry in knowledge/verifications.md. Required for experiments (EXP); unused by verifier changes.",
+      "type": "string",
+      "minLength": 1
+    },
     "diff": {
       "description": "Generalized diff vs the parent. Root experiments pin data and evaluation absolutely instead of as a diff.",
       "type": "object",
@@ -170,5 +175,21 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "id": { "pattern": "^EXP-" } },
+        "required": ["id"]
+      },
+      "then": { "required": ["primary_metric"] }
+    },
+    {
+      "if": {
+        "properties": { "id": { "pattern": "^VER-" } },
+        "required": ["id"]
+      },
+      "then": { "required": ["verifier"] }
+    }
+  ]
 }

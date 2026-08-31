@@ -126,10 +126,11 @@ Mutability:
 ## What: files and fields
 
 **`spec.md`** frontmatter: `id`, `slug`, `parent`, `compare_to`, `status`,
-`iteration`, `hypothesis`, `diff` (`code.scope` + `code.summary`, `config`,
-`data`, `evaluation`), `assertions` (each: `id`, `metric`, `at`, `condition`,
-`source`), `budgets`, `artifacts_expected`, `decision_rule`, `assumptions`.
-Body: Idea, Motivation, Risks, Enrichment log.
+`iteration`, `hypothesis`, `primary_metric` (EXP only: the metric success is
+judged by — chosen per experiment), `diff` (`code.scope` + `code.summary`,
+`config`, `data`, `evaluation`), `assertions` (each: `id`, `metric`, `at`,
+`condition`, `source`), `budgets`, `artifacts_expected`, `decision_rule`,
+`assumptions`. Body: Idea, Motivation, Risks, Enrichment log.
 
 **`runs/iNN/record.md`** frontmatter: `experiment`, `iteration`, `commit`,
 `branch`, `dirty`, `env` (lockfile hash, python/torch/cuda, hardware),
@@ -147,7 +148,8 @@ report).
 `merge_to_main`, `merge_commit`. Body: Analysis, Conclusions, Follow-ups.
 
 **`registry.md`**: one table row per change — ID, slug, type (exp/ver),
-parent, status, iteration, headline metric, date.
+parent, status, iteration, headline metric (the spec's `primary_metric` and
+its latest value), date.
 
 **Verifier-change specs** additionally fill the `verifier` frontmatter block:
 `type` (`deterministic-script` / `metric-observation` / `ai-review`),
@@ -156,10 +158,11 @@ parent, status, iteration, headline metric, date.
 **`knowledge/verifications.md`**: the verification registry (schema:
 `verifications.schema.json`) — per verification: `id`, `type`, `verifies`,
 `phase`, `gating` (`gate`/`advisory`/`analysis-only`), `params`, for
-metric-observation entries the `metric` (name, kind
-`primary`/`proxy`/`diagnostic`, definition, logged_by), `implemented_by`
-(the VER/EXP that introduced it), `references` (backfilled values with
-provenance). Maintained per the experiment-planning skill.
+metric-observation entries the `metric` (name, kind `quality`/`diagnostic`,
+definition, logged_by — primary/proxy roles are per-experiment via
+`spec.primary_metric`, not fixed here), `implemented_by` (the VER/EXP that
+introduced it), `references` (backfilled values with provenance). Maintained
+per the experiment-planning skill.
 
 ## When: status transitions
 
