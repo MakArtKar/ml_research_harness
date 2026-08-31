@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "record.schema.json",
   "title": "Run record frontmatter",
-  "description": "Validates the YAML frontmatter of experiments/EXP-NNNN-slug/runs/iNN/record.md. Immutable once the iteration ends.",
+  "description": "Validates the YAML frontmatter of a change's runs/iNN/record.md (experiments and verifier changes). Immutable once the iteration ends. For verifier changes, `setup` describes the reference run used for equivalence/backfill.",
   "type": "object",
   "required": [
     "experiment",
@@ -18,8 +18,9 @@
   ],
   "properties": {
     "experiment": {
+      "description": "The change this run belongs to (experiment or verifier change).",
       "type": "string",
-      "pattern": "^EXP-[0-9]{4,}$"
+      "pattern": "^(EXP|VER)-[0-9]{4,}$"
     },
     "iteration": {
       "type": "integer",

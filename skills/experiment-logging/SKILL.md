@@ -30,11 +30,17 @@ human-readable at the same time. Follow them for every experiment.
   Iteration statuses cycle: `planned → running → completed → analyzed`, then
   either back to `planned` (verdict `revise`, iteration+1) or to a terminal
   status (`accepted` / `rejected` / `inconclusive`).
-- **Engineering changes** (`ENG-NNNN`) are code changes with **no hypothesis
-  about model quality**: instrumentation/metrics, refactoring,
-  infrastructure, bootstrap implementation. They never occupy the experiment
-  loop — they are documented in the engineering log and verified by the
-  reduced pipeline (experiment-process skill).
+- **Verifier changes** (`VER-NNNN`) implement or modify a **verification**:
+  a metric plus how to read it, a deterministic check script, or an
+  AI-review checker. They use the *same machinery* as experiments — living
+  spec, agent loop with iterations, run records, report, approval gates —
+  but their run is verifier calibration instead of model training
+  (experiment-process skill). On acceptance the verification merges into the
+  registry `knowledge/verifications.md`.
+- **Maintenance commits** (small refactors, infra) carry no id. They must
+  keep the tree green and, when result-neutral, pass the standing
+  `equivalence` verifier (unchanged command, few steps → identical loss,
+  metrics, artifacts).
 
 ## Where
 
@@ -43,11 +49,7 @@ the field definitions below if templates are unavailable):
 
 ```
 experiments/
-  registry.md                     # index: one row per experiment
-  engineering/
-    log.md                        # index: one row per engineering change
-    ENG-0007/
-      checks/                     # reduced-pipeline verdicts for that change
+  registry.md                     # index: one row per change (EXP and VER)
   EXP-0042-attn-dropout/
     spec.md                       # living plan (see experiment-planning skill)
     runs/
@@ -57,10 +59,15 @@ experiments/
       i02/
         ...
     report.md                     # final synthesis, written at terminal verdict
+  VER-0003-acclen-by-position/    # verifier change: identical layout
+    spec.md
+    runs/i01/ ...
+    report.md
 knowledge/
-  findings.md                     # validated conclusions, linked to EXP ids
-  metrics.md                      # metric registry: every metric + its verification
-  conventions.md                  # repo-specific facts (env, data paths, budgets)
+  findings.md                     # validated conclusions, linked to EXP/VER ids
+  verifications.md                # verification registry: every verification + params + references
+  conventions.md                  # repo-specific facts (env, data paths, budgets,
+                                  # the standard eval command)
 .harness/
   checkers/                       # generated checks — OFF-LIMITS to the implementer
 ```
@@ -84,8 +91,9 @@ Rules:
   iteration: `[EXP-0042.i3] fix attention mask`. Never squash or amend on the
   `exp/` branch while the loop runs — the commit trail is the record of how
   errors were fixed and the anchor for resuming an interrupted loop.
-- Engineering changes commit with their own prefix — `[ENG-0007] log
-  per-position acceptance length` — on `main` or a short-lived branch.
+- Verifier changes follow the same conventions with their own prefix:
+  branch `ver/VER-NNNN-slug`, commits `[VER-0003.i1] ...`.
+- Maintenance commits carry no id prefix; each must leave the tree green.
 - Docs (`experiments/…`, `knowledge/…`) are committed on the experiment
   branch during the loop. At a terminal verdict, docs always land on `main`
   (merge or cherry-pick) regardless of the code-merge decision, so history
@@ -138,18 +146,19 @@ report).
 `vs`, `reference`, `value`, `delta`), `knowledge_merge` (file + summary),
 `merge_to_main`, `merge_commit`. Body: Analysis, Conclusions, Follow-ups.
 
-**`registry.md`**: one table row per experiment — ID, slug, parent, status,
-iteration, headline metric, date.
+**`registry.md`**: one table row per change — ID, slug, type (exp/ver),
+parent, status, iteration, headline metric, date.
 
-**`engineering/log.md`**: one table row per engineering change — ID, date,
-kind (`metrics` / `refactor` / `infra` / `bootstrap`), summary, commits,
-verification (check ids that passed). Verdicts live in
-`engineering/ENG-NNNN/checks/`.
+**Verifier-change specs** additionally fill the `verifier` frontmatter block:
+`type` (`deterministic-script` / `metric-observation` / `ai-review`),
+`verifies`, `calibration` cases, and a `registry_entry` draft.
 
-**`knowledge/metrics.md`**: the metric registry (schema:
-`metrics.schema.json`) — per metric: `name`, `kind`
-(`primary`/`proxy`/`diagnostic`), `definition`, `logged_by`, `added_by`,
-`verification` (type/phase/params), `references` (backfilled values with
+**`knowledge/verifications.md`**: the verification registry (schema:
+`verifications.schema.json`) — per verification: `id`, `type`, `verifies`,
+`phase`, `gating` (`gate`/`advisory`/`analysis-only`), `params`, for
+metric-observation entries the `metric` (name, kind
+`primary`/`proxy`/`diagnostic`, definition, logged_by), `implemented_by`
+(the VER/EXP that introduced it), `references` (backfilled values with
 provenance). Maintained per the experiment-planning skill.
 
 ## When: status transitions
@@ -169,34 +178,33 @@ On `revise`: prepare the spec diff for approval (experiment-planning skill);
 on approval, bump `iteration` in the spec, set `planned`, create
 `runs/iNN+1/`.
 
-## Engineering changes
+## Verifier changes
 
-When a change carries no hypothesis about model quality, document it as an
-engineering change instead of an experiment:
+A verifier change is documented exactly like an experiment: registry row
+(type `ver`), folder `experiments/VER-NNNN-slug/` with living `spec.md`,
+per-iteration `runs/iNN/` records and checks, and a final `report.md`. The
+same status table applies. What differs:
 
-1. Allocate `ENG-NNNN` by appending a row to `experiments/engineering/log.md`
-   (kind: `metrics` / `refactor` / `infra` / `bootstrap`).
-2. Commit with the `[ENG-NNNN]` prefix.
-3. Run the reduced verification pipeline (experiment-process skill); verdicts
-   go to `experiments/engineering/ENG-NNNN/checks/`. Mark the row's
-   Verification column only when the required checks pass.
-4. If the change adds or modifies a metric: update `knowledge/metrics.md`
-   (registry entry + verification mapping + backfilled references, per the
-   experiment-planning skill). A logged metric without a registry entry is an
-   audit failure.
-5. Result-neutral changes (refactors, pure instrumentation) must pass the
-   equivalence check — previously registered metrics unchanged on a
-   reference checkpoint.
+- the spec fills the `verifier` block (type, what it verifies, calibration
+  cases, registry-entry draft);
+- the iteration run is verifier calibration + equivalence + reference
+  backfill instead of model training (experiment-process skill);
+- the knowledge merge on acceptance targets `knowledge/verifications.md`.
+
+A logged metric without a `metric-observation` entry in the registry is an
+audit failure — logging a metric *is* implementing a verification.
 
 ## Scaffolding (first use in a repo)
 
-1. Create `experiments/registry.md` and `experiments/engineering/log.md`
-   from the templates.
-2. Create `knowledge/findings.md` (empty list), `knowledge/metrics.md`
-   (register every metric the repo already logs, with kinds and verification
-   mappings), and `knowledge/conventions.md`, filling conventions by
-   inspecting the repo: environment and how it is built, entry points, data
-   locations, typical budgets, logging setup.
+1. Create `experiments/registry.md` from the template.
+2. Create `knowledge/findings.md` (empty list), `knowledge/verifications.md`
+   (register every metric the repo already logs as a `metric-observation`
+   verification, plus the standing verifiers from the checker catalog), and
+   `knowledge/conventions.md`, filling conventions by inspecting the repo:
+   environment and how it is built, entry points, data locations, typical
+   budgets, logging setup, and **the standard eval command** — how to run
+   validation on a frozen checkpoint with no code changes (required for
+   reference backfill).
 3. Leave `.harness/checkers/` to the checker agent (experiment-process
    skill) — do not populate it while scaffolding.
 
@@ -208,6 +216,7 @@ matches the spec frontmatter (status, iteration); verify artifact links in
 run records resolve; verify every `[EXP-NNNN.iN]` commit's iteration has a
 `runs/iNN/` directory.
 
-To audit instrumentation: every metric the code logs has an entry in
-`knowledge/metrics.md` with a verification mapping; every engineering-log
-row has its checks green; every `[ENG-NNNN]` commit has a log row.
+To audit instrumentation: every metric the code logs has a
+`metric-observation` entry in `knowledge/verifications.md`; every registry
+entry's `implemented_by` change exists and is terminal; the standard eval
+command in `knowledge/conventions.md` still works.

@@ -1,6 +1,6 @@
 ---
 # Validate against schemas/spec.schema.json.
-id: EXP-NNNN
+id: EXP-NNNN            # EXP-NNNN (experiment) or VER-NNNN (verifier change)
 slug: short-slug
 parent: null            # EXP-NNNN of the parent, or null for a root experiment
 compare_to: []          # runs to beat; assertions reference their numbers (default: [parent])
@@ -32,6 +32,13 @@ decision_rule: >
   What result means accept / reject / inconclusive / revise, including
   early-kill thresholds used during training.
 assumptions: []         # obvious-but-real off-spec decisions, logged during iterations
+# verifier:             # VER changes only — what verification is implemented
+#   type: metric-observation   # deterministic-script | metric-observation | ai-review
+#   verifies: ""
+#   calibration:               # >=1 known-good (pass) and >=1 known-bad (fail) case
+#     - {case: "", expect: pass}
+#     - {case: "", expect: fail}
+#   registry_entry: {}         # draft knowledge/verifications.md entry to merge on acceptance
 ---
 
 # EXP-NNNN — Title

@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "spec.schema.json",
-  "title": "Experiment spec frontmatter",
-  "description": "Validates the YAML frontmatter of experiments/EXP-NNNN-slug/spec.md (after YAML-to-JSON conversion).",
+  "title": "Change spec frontmatter",
+  "description": "Validates the YAML frontmatter of a change's spec.md (after YAML-to-JSON conversion). A change is an experiment (EXP-NNNN) or a verifier change (VER-NNNN) — both use the same spec machinery; VER specs additionally fill the `verifier` block.",
   "type": "object",
   "required": [
     "id",
@@ -22,16 +22,16 @@
   "properties": {
     "id": {
       "type": "string",
-      "pattern": "^EXP-[0-9]{4,}$"
+      "pattern": "^(EXP|VER)-[0-9]{4,}$"
     },
     "slug": {
       "type": "string",
       "pattern": "^[a-z0-9][a-z0-9-]*$"
     },
     "parent": {
-      "description": "Experiment this one derives from; null for a root experiment.",
+      "description": "Change this one derives from; null for a root experiment or a standalone verifier change.",
       "oneOf": [
-        { "type": "string", "pattern": "^EXP-[0-9]{4,}$" },
+        { "type": "string", "pattern": "^(EXP|VER)-[0-9]{4,}$" },
         { "type": "null" }
       ]
     },
@@ -139,6 +139,36 @@
       "description": "Reserved for multi-seed support (post-v1).",
       "type": "array",
       "items": { "type": "integer" }
+    },
+    "verifier": {
+      "description": "Present only for verifier changes (VER-NNNN): what verification is being implemented or modified.",
+      "type": "object",
+      "required": ["type", "verifies", "calibration"],
+      "properties": {
+        "type": {
+          "enum": ["deterministic-script", "metric-observation", "ai-review"]
+        },
+        "verifies": {
+          "description": "What property of an experiment this verification checks, and what its failure suggests.",
+          "type": "string"
+        },
+        "calibration": {
+          "description": "Known cases the finished verifier must classify correctly — at least one known-good (expect pass) and one known-bad (expect fail).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["case", "expect"],
+            "properties": {
+              "case": { "type": "string" },
+              "expect": { "enum": ["pass", "fail"] }
+            }
+          }
+        },
+        "registry_entry": {
+          "description": "Draft of the knowledge/verifications.md entry to merge on acceptance.",
+          "type": "object"
+        }
+      }
     }
   }
 }

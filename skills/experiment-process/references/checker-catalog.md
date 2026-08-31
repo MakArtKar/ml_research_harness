@@ -58,9 +58,9 @@ the `compare_to` records.
 ## Phase 3 — during training (watchdog)
 
 Streaming checks over the full run; a critical trip kills or pauses the run.
-Band parameters (bounds, spike factors, patience) come from the
-`verification.params` of `diagnostic` entries in the metric registry
-(`knowledge/metrics.md`); the spec may tighten them per experiment.
+Band parameters (bounds, spike factors, patience) come from the `params` of
+`diagnostic` metric-observation entries in the verification registry
+(`knowledge/verifications.md`); the spec may tighten them per experiment.
 
 | Id | Kind | Check | Pass criterion |
 |---|---|---|---|
@@ -79,33 +79,42 @@ Band parameters (bounds, spike factors, patience) come from the
 | Id | Kind | Check | Pass criterion |
 |---|---|---|---|
 | `p4/artifact-manifest` | D | Everything in `artifacts_expected` exists and is valid | metrics file has required fields; checkpoint loads; config snapshot + commit hash recorded; links resolve |
-| `p4/assertions` | D | Every spec assertion evaluated against `compare_to` numbers (from records, or from metric-registry `references` for backfilled metrics) | all pass (or each failure listed with its margin) |
+| `p4/assertions` | D | Every spec assertion evaluated against `compare_to` numbers (from records, or from verification-registry `references` for backfilled metrics) | all pass (or each failure listed with its margin) |
 | `p4/checkpoint-roundtrip` | D | Final checkpoint: load + eval | reproduces recorded metrics within tolerance |
 | `p4/results-review` | AI | Isolated review. Input: spec + metrics + curves + assertion verdicts (never the executor's conversation) | verdict proposal — hypothesis confirmed / refuted / inconclusive — with anomalies and follow-ups |
 | `p4/aggregate` | D | Fold all verdicts of the iteration into one machine-readable iteration verdict per the spec's decision rule | `accept` / `revise` / `reject` / `inconclusive` / `escalate-to-human` |
 
-## Engineering pipeline (ENG changes)
+## Verifier-change run (VER changes)
 
-Reduced pipeline for changes with no hypothesis about model quality.
-Verdicts land in `experiments/engineering/ENG-NNNN/checks/`.
+Replaces phases 2–4 inside a verifier change's iteration. Verdicts land in
+the change's `runs/iNN/checks/` as usual.
 
 | Id | Kind | Check | Pass criterion |
 |---|---|---|---|
-| `e/static` | D | Lint, typecheck, unit tests | all pass |
-| `e/scope` | D | Files touched vs the change's declared intent | no unrelated files |
-| `e/smoke` | D | Training smoke run | completes without exceptions |
-| `e/equivalence` | D | Result-neutral changes only (refactors, pure instrumentation): smoke/eval re-run at a reference checkpoint | every previously registered metric unchanged within declared tolerance |
-| `e/metric-known-value` | D | New/changed metrics: compute on inputs with an analytically known value | matches |
-| `e/metric-registered` | D | New/changed metrics: `knowledge/metrics.md` entry valid per `metrics.schema.json`; its checker generated; `references` backfilled or waiver recorded | all hold |
+| `v/static` | D | Lint, typecheck, unit tests | all pass |
+| `v/scope` | D | `git diff` vs spec scope | ⊆ allowlist |
+| `v/calibration` | D/AI | Run the verifier on the spec's calibration cases (known metric values, planted bugs, shuffled labels, curated diffs for AI checkers) | passes every known-good AND fails every known-bad case |
+| `v/equivalence` | D | The standing `equivalence` verifier: unchanged training command, few steps | loss, previously registered metrics, artifacts identical within tolerance |
+| `v/references` | D | Metric observations: backfill via the standard eval command on frozen reference checkpoint(s); through-training metrics over all saved checkpoints | values + provenance in the registry-entry draft, or waiver recorded |
+
+## Standing verifiers
+
+Instantiated at scaffold time from this catalog and registered in
+`knowledge/verifications.md` like everything else:
+
+- `equivalence` — re-run an unchanged command for a few steps: identical
+  loss, registered metrics, and artifacts. The gate for every result-neutral
+  change (refactors, instrumentation, verifier implementations).
 
 ## Generation notes for the checker agent
 
 - Generate checkers as small standalone scripts in `.harness/checkers/`,
   named by check id, each printing exactly one verdict JSON to stdout and
   exiting nonzero on `fail`.
-- Read thresholds from the spec frontmatter and reference numbers from
-  `compare_to` records at runtime — do not hardcode numbers that belong to
-  the spec.
+- Read thresholds from the spec frontmatter, band/calibration params from
+  `knowledge/verifications.md`, and reference numbers from `compare_to`
+  records or registry `references` at runtime — do not hardcode numbers that
+  belong to the spec or the registry.
 - Repo-specific adaptation (entry points, config system, logger) is
   expected; document it in `knowledge/conventions.md`.
 - Checkers are code: version them, and route any checker change through

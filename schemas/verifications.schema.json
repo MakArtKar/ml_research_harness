@@ -1,0 +1,98 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "verifications.schema.json",
+  "title": "Verification registry frontmatter",
+  "description": "Validates the YAML frontmatter of knowledge/verifications.md — the registry of verifications available in this repo. A verification is anything that checks an experiment: a deterministic script, an AI-review checker, or observing a metric and drawing conclusions. Verifications both gate the loop and feed analysis (a revealed problem can seed a follow-up experiment).",
+  "type": "object",
+  "required": ["verifications"],
+  "properties": {
+    "verifications": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "verifies"],
+        "properties": {
+          "id": {
+            "description": "Stable id, e.g. \"p2/single-batch-overfit\", \"equivalence\", \"metric/val-greedy-accepted-length\".",
+            "type": "string"
+          },
+          "type": {
+            "enum": ["deterministic-script", "metric-observation", "ai-review"]
+          },
+          "verifies": {
+            "description": "What property of an experiment this verification checks, and what its failure suggests (fix vs follow-up experiment).",
+            "type": "string"
+          },
+          "phase": {
+            "description": "Pipeline phase (0-4) where it runs, if phase-bound.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4
+          },
+          "gating": {
+            "description": "gate = a failure blocks the loop; advisory = feeds analysis and anomaly triggers; analysis-only = interpreted by humans/AI during analysis.",
+            "enum": ["gate", "advisory", "analysis-only"]
+          },
+          "params": {
+            "description": "Checker parameters: band bounds, spike factor, patience, tolerance, assertion pattern.",
+            "type": "object"
+          },
+          "metric": {
+            "description": "For metric-observation entries: the observed metric.",
+            "type": "object",
+            "required": ["name", "kind", "definition"],
+            "properties": {
+              "name": {
+                "description": "Logger key, e.g. \"val/greedy_accepted_length\".",
+                "type": "string"
+              },
+              "kind": {
+                "description": "primary = measures experiment quality (headline); proxy = correlates with primary, localizes what to improve; diagnostic = training health.",
+                "enum": ["primary", "proxy", "diagnostic"]
+              },
+              "definition": {
+                "description": "What the metric computes, precisely enough to reimplement.",
+                "type": "string"
+              },
+              "logged_by": {
+                "description": "Where in the code / which component emits it.",
+                "type": "string"
+              }
+            }
+          },
+          "implemented_by": {
+            "description": "The change that introduced or last modified this verification.",
+            "type": "string",
+            "pattern": "^(EXP|VER)-[0-9]{4,}$"
+          },
+          "references": {
+            "description": "Reference values with provenance, backfilled by running the repo's standard eval command on frozen reference checkpoint(s) — over all saved checkpoints for through-training metrics. Run records are never edited retroactively.",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["experiment", "value"],
+              "properties": {
+                "experiment": {
+                  "type": "string",
+                  "pattern": "^EXP-[0-9]{4,}$"
+                },
+                "checkpoint": {
+                  "description": "Which checkpoint(s) the value was measured on.",
+                  "type": "string"
+                },
+                "value": {
+                  "description": "Number, array for vector metrics (e.g. per-position), or per-checkpoint series."
+                },
+                "measured_at": {
+                  "description": "Commit hash of the measuring code.",
+                  "type": "string"
+                },
+                "date": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

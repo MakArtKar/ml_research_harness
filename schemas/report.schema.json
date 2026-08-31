@@ -14,8 +14,9 @@
   ],
   "properties": {
     "experiment": {
+      "description": "The change this report concludes (experiment or verifier change).",
       "type": "string",
-      "pattern": "^EXP-[0-9]{4,}$"
+      "pattern": "^(EXP|VER)-[0-9]{4,}$"
     },
     "verdict": {
       "enum": ["accepted", "rejected", "inconclusive"]

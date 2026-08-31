@@ -37,14 +37,18 @@ hypothesis to validated knowledge.
   cannot express (spec review, intent diff, results interpretation). Every
   check emits a machine-readable verdict
   `{id, phase, verdict, severity, evidence}`.
-- **A metric is a verification.** Every logged metric lives in a registry
-  (`knowledge/metrics.md`) as `primary` (headline quality → assertions),
-  `proxy` (localizes what to improve → advisory checks), or `diagnostic`
-  (training health → watchdog bands); checkers are derived from the
-  registry. Changes without a quality hypothesis — adding metrics,
-  refactoring, infra, bootstrap — are **engineering changes** (`ENG-NNNN`)
-  with a reduced pipeline (smoke, equivalence, known-value checks) instead
-  of the full experiment loop.
+- **Verifications are first-class.** The registry
+  (`knowledge/verifications.md`) lists every verification: deterministic
+  scripts, AI-review checkers, and metric observations — a metric plus how
+  to read it, as `primary` (headline quality → assertions), `proxy`
+  (localizes what to improve → advisory), or `diagnostic` (training health
+  → watchdog bands). Checkers are derived from the registry. Implementing a
+  verifier (a metric, a script, an AI checker) is a **verifier change**
+  (`VER-NNNN`) that uses the same spec-and-loop machinery as an experiment,
+  with calibration (must fail known-bad cases), equivalence (must not alter
+  training), and reference backfill on frozen checkpoints in place of a
+  training run. Verifications gate the loop *and* drive analysis: a revealed
+  problem seeds a follow-up experiment.
 - **Checker isolation.** Deterministic checkers are generated per target
   repo by a *different* agent than the one implementing the experiment, live
   outside the implementer's allowed scope, and verifier prompts are never
@@ -102,16 +106,16 @@ A target repo ends up looking like:
 
 ```
 experiments/
-  registry.md
-  engineering/            # log.md + per-ENG checks: metric/infra/refactor changes
+  registry.md             # one row per change (EXP and VER)
   EXP-0042-attn-dropout/
     spec.md               # living plan
     runs/i01/ i02/ ...    # per-iteration record.md + checks/
     report.md             # final synthesis
+  VER-0003-.../           # verifier change: identical layout
 knowledge/
-  findings.md             # validated conclusions, linked to EXP ids
-  metrics.md              # metric registry: every metric + its verification
-  conventions.md          # repo-specific facts
+  findings.md             # validated conclusions, linked to EXP/VER ids
+  verifications.md        # verification registry (+ backfilled references)
+  conventions.md          # repo-specific facts, incl. the standard eval command
 .harness/
   checkers/               # generated checks, off-limits to the implementer
 ```

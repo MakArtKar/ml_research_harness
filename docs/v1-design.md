@@ -1,7 +1,7 @@
 # V1 Design: Architecture, Use Cases, and Skills
 
-Status: agreed v1 scope. Last updated: 2026-08-31 (added engineering changes
-and the metric registry).
+Status: agreed v1 scope. Last updated: 2026-08-31 (added verifier changes
+and the verification registry).
 
 ## 1. What this project is
 
@@ -85,38 +85,52 @@ frontmatter (status + iteration), the registry row, and the last
 iteration-tagged commit (see 3.3). No separate state file — it would duplicate
 the source of truth.
 
-### Engineering changes
+### Verifier changes — the second change type
 
-Not every change is an experiment. A change with **no hypothesis about model
-quality** — adding metrics/instrumentation, refactoring, infrastructure, or
-the bootstrap implementation of the codebase itself — is an **engineering
-change** (`ENG-NNNN`): a row in `experiments/engineering/log.md`, commits
-prefixed `[ENG-NNNN]`, and a reduced verification pipeline (static checks,
-scope-vs-intent, smoke, and — for result-neutral changes — an equivalence
-check: previously registered metrics unchanged on a reference checkpoint).
-No spec, no loop. This also solves the from-scratch bootstrap: the initial
-implementation lands as engineering changes verified against the root
-experiment's spec, and the root experiment then pins the finished commit.
+Not every change is an experiment. A change that **implements or modifies a
+verification** — a metric plus how to read it, a deterministic check script,
+an AI-review checker — is a **verifier change** (`VER-NNNN`). It uses the
+*same machinery* as an experiment: a living spec with approval gates, the
+agent loop with iterations, run records, a report, and an openspec-style
+merge into knowledge on acceptance. What differs is the run: instead of
+phases 2–4 (training), a verifier change runs **calibration** (the verifier
+must pass known-good cases AND fail known-bad ones — a verifier that cannot
+fail verifies nothing), **equivalence** (implementing it must not alter
+training: unchanged command, few steps, identical loss/metrics/artifacts),
+and **reference backfill** (below).
 
-### Metric registry — a metric is a verification
+Small refactors and infra remain **maintenance commits**: no id, tree stays
+green, result-neutral ones pass the standing `equivalence` verifier.
 
-Metrics are logged for a reason, and each reason implies a check. The
-registry `knowledge/metrics.md` records every logged metric with its kind
-and its verification mapping:
+### Verification registry — a metric is a verification
 
-| Kind | Purpose | Verification |
+Verifications are first-class knowledge. The registry
+`knowledge/verifications.md` lists every verification available in the repo:
+its type (`deterministic-script` / `metric-observation` / `ai-review`), what
+it verifies, its phase and gating mode, its params, and — for metric
+observations — the metric itself with its kind:
+
+| Metric kind | Purpose | Default verification |
 |---|---|---|
 | `primary` | measures experiment quality (headline) | phase-4 assertion vs `compare_to` |
 | `proxy` | correlates with primary; localizes what to improve | advisory check feeding analysis and anomaly triggers |
 | `diagnostic` | training health (grad norm, loss by position, latent std, perf) | phase-3 watchdog band or analysis-only |
 
-The checker agent derives metric-backed checks from registry entries, so
-"log a new metric" literally means "prepare a new verification". Adding a
-metric is an engineering change with extra obligations: registry entry,
-generated checker, and **backfill** — the metric is measured on the current
-reference checkpoint(s) via an eval-only run and the values stored in the
-entry's `references` with provenance. Run records stay immutable; backfilled
-numbers live in the registry, and assertions may ground in either.
+The checker agent derives all checks from registry entries, so "log a new
+metric" literally means "implement a new verification". Verifications serve
+two purposes: **gating** the loop, and **analysis** — a verification that
+reveals a problem whose fix is a different improvement concludes the current
+experiment and seeds a **follow-up experiment** that closes it (recorded in
+the report's Follow-ups); `revise` is only for fixing the current
+hypothesis's own implementation.
+
+**Reference backfill.** A metric added after a reference run is measured by
+running the repo's **standard eval command** (a required convention in
+`knowledge/conventions.md`) on the frozen reference checkpoint(s) — no code
+changes, no baseline retraining; through-training metrics run over all saved
+checkpoints. Values live in the registry entry's `references` with
+provenance. Run records stay immutable; assertions may ground in records or
+registry references.
 
 ### Living spec
 
@@ -184,18 +198,17 @@ ml_research_harness/
 │       └── references/
 │           └── checker-catalog.md   # full phase 0–4 checker list
 ├── schemas/
-│   ├── spec.schema.json      # frontmatter of spec.md
-│   ├── record.schema.json    # frontmatter of a run record
-│   ├── report.schema.json    # frontmatter of report.md
-│   ├── metrics.schema.json   # frontmatter of the metric registry
-│   └── verdict.schema.json   # check verdict format
+│   ├── spec.schema.json           # frontmatter of spec.md (EXP and VER)
+│   ├── record.schema.json         # frontmatter of a run record
+│   ├── report.schema.json         # frontmatter of report.md
+│   ├── verifications.schema.json  # frontmatter of the verification registry
+│   └── verdict.schema.json        # check verdict format
 └── templates/
     ├── spec.md
     ├── record.md
     ├── report.md
     ├── registry.md
-    ├── metrics.md
-    └── engineering-log.md
+    └── verifications.md
 ```
 
 ### 3.2 Target repo layout (created and maintained by the skills)
@@ -203,24 +216,23 @@ ml_research_harness/
 ```
 <target-repo>/
 ├── experiments/
-│   ├── registry.md                 # index: one row per experiment
-│   ├── engineering/
-│   │   ├── log.md                  # index: one row per engineering change
-│   │   └── ENG-0007/
-│   │       └── checks/             # reduced-pipeline verdicts
-│   └── EXP-0042-attn-dropout/
-│       ├── spec.md                 # living plan, enriched each iteration
-│       ├── runs/
-│       │   ├── i01/
-│       │   │   ├── record.md       # commit, config, artifacts, results
-│       │   │   └── checks/         # verification verdicts, one JSON per check
-│       │   └── i02/
-│       │       └── ...
-│       └── report.md               # final synthesis: analysis, conclusions, verdict
+│   ├── registry.md                 # index: one row per change (EXP and VER)
+│   ├── EXP-0042-attn-dropout/
+│   │   ├── spec.md                 # living plan, enriched each iteration
+│   │   ├── runs/
+│   │   │   ├── i01/
+│   │   │   │   ├── record.md       # commit, config, artifacts, results
+│   │   │   │   └── checks/         # verification verdicts, one JSON per check
+│   │   │   └── i02/
+│   │   │       └── ...
+│   │   └── report.md               # final synthesis: analysis, conclusions, verdict
+│   └── VER-0003-acclen-by-position/   # verifier change: identical layout
+│       └── ...
 ├── knowledge/
-│   ├── findings.md                 # validated conclusions, linked to EXP ids
-│   ├── metrics.md                  # metric registry: every metric + its verification
-│   └── conventions.md              # repo-specific facts (env, data, budgets)
+│   ├── findings.md                 # validated conclusions, linked to EXP/VER ids
+│   ├── verifications.md            # verification registry (+ backfilled references)
+│   └── conventions.md              # repo-specific facts (env, data, budgets,
+│                                   # the standard eval command)
 └── .harness/
     └── checkers/                   # generated deterministic checks (see 4.3)
 ```
@@ -272,9 +284,8 @@ commit conventions as in 3.3.
 | `spec.md` | id, slug, parent, compare_to, status, iteration, hypothesis, generalized diff (code scope allowlist + config diff + data + evaluation), assertions (expected metric behavior with thresholds vs compare_to), budgets (time, memory, steps/sec), expected artifact manifest, assumptions; *body*: idea, motivation, risks, enrichment log |
 | `runs/iNN/record.md` | iteration, commit hash, branch, dirty flag, env snapshot (deps lockfile hash, torch/CUDA), resolved config snapshot (or its path + hash), setup split into model, data, training (hardware + hyperparameters) and evaluation (hardware + benchmarks + sampling params), launch command, artifact links (wandb URL, checkpoint URIs, log paths), final metrics, iteration verdict; *body*: run notes, incidents, per-iteration analysis |
 | `report.md` | verdict (accepted / rejected / inconclusive), headline metric deltas vs compare_to, iterations count, knowledge-merge summary, merge-to-main decision; *body*: final analysis, conclusions, follow-up ideas |
-| `registry.md` | one row per experiment: id, slug, parent, status, iteration, headline metric, date |
-| `engineering/log.md` | one row per engineering change: id, date, kind (metrics/refactor/infra/bootstrap), summary, commits, verification |
-| `knowledge/metrics.md` | metric registry: per metric — name, kind (primary/proxy/diagnostic), definition, logged_by, added_by, verification mapping, backfilled references |
+| `registry.md` | one row per change (EXP and VER): id, slug, type, parent, status, iteration, headline metric, date |
+| `knowledge/verifications.md` | verification registry: per verification — id, type (deterministic-script/metric-observation/ai-review), verifies, phase, gating, params, metric (name + kind primary/proxy/diagnostic + definition), implemented_by, backfilled references |
 
 **How.** Dual format per section 2: YAML frontmatter validated against
 `schemas/`, narrative in the body. Mutability is explicit: `spec.md` is a
@@ -351,12 +362,14 @@ config-only diffs (there the config *is* the diff). A full-length ablation
 run is never automatic — only on explicit request (e.g. before claiming a
 result in a paper).
 
-**Engineering pipeline.** Engineering changes skip the loop and run a
-reduced pipeline: `e/static`, `e/scope` (files vs declared intent),
-`e/smoke`, `e/equivalence` (result-neutral changes: previously registered
-metrics unchanged at a reference checkpoint), and for metric changes
-`e/metric-known-value` + `e/metric-registered`. Verdicts land in
-`experiments/engineering/ENG-NNNN/checks/`.
+**Verifier-change run.** Verifier changes go through the same loop, but in
+place of phases 2–4: `v/static`, `v/scope`, `v/calibration` (pass every
+known-good AND fail every known-bad case from the spec), `v/equivalence`
+(the standing verifier: unchanged command, few steps, identical
+loss/metrics/artifacts), `v/references` (backfill via the standard eval
+command on frozen checkpoints). Verdicts land in the change's
+`runs/iNN/checks/` as usual; acceptance merges the registry entry into
+`knowledge/verifications.md`.
 
 Cross-cutting rules baked into the skill:
 
@@ -413,27 +426,30 @@ frontmatter (status + iteration), finds the last `[EXP-NNNN.iN]` commit and
 the current iteration's `runs/iNN/` contents, and continues from the first
 incomplete step of that iteration's cycle.
 
-**S8 — Add a metric.** User: "log acceptance length per block position".
-Agent opens an engineering change (`ENG-NNNN`), implements the logging, adds
-the registry entry (kind, definition, verification mapping), passes the
-reduced pipeline including known-value and equivalence checks, has the
-checker agent generate the metric's check, and backfills reference values on
-the current reference checkpoint. The new metric is now assertable by future
-specs.
+**S8 — Implement a verifier.** User: "log acceptance length per block
+position" (or "add a leakage check", "add an AI reviewer for masks"). Agent
+opens a verifier change (`VER-NNNN`) with a spec declaring what it verifies,
+calibration cases, and a registry-entry draft; implements it through the
+loop; passes calibration + equivalence + reference backfill; on acceptance
+the verification merges into `knowledge/verifications.md` and its check is
+generated. The new metric/check is now usable by future specs and analyses.
 
 **S9 — Bootstrap a repo from scratch.** The root experiment's spec is
 written first and doubles as the implementation contract; the codebase is
-then built as a series of engineering changes (`bootstrap` kind) verified by
-the reduced pipeline; finally the root experiment pins the finished commit
-and runs phases 2–4 (S2).
+built inside the root experiment's iteration 1 (commits `[EXP-0001.i1]`),
+kept green by static checks and smoke as it grows; then the root experiment
+pins the finished commit and runs phases 2–4 (S2). The first verifier
+changes (the standing `equivalence` verifier, metric observations for
+whatever the code logs) follow immediately after.
 
 ## 6. V1 scope
 
 **In:**
 
-- The three skills, with schemas and templates — including engineering
-  changes (`ENG`), the metric registry with per-metric verifications, and
-  backfill rules.
+- The three skills, with schemas and templates — including verifier changes
+  (`VER`) sharing the experiment machinery, the verification registry with
+  metric-observation entries, and reference backfill via the standard eval
+  command.
 - Checker catalog as a reference document; skills able to generate phase 0–2
   deterministic checkers for a concrete repo (phases 3–4 may start as
   documented procedures rather than generated code).

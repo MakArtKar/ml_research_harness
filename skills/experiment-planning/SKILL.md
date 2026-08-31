@@ -5,9 +5,10 @@ description: >-
   hypotheses, generalized diffs (code, config, data, evaluation), assertions
   grounded in recorded numbers, declared decision rules and budgets, and
   living-spec maintenance with human approval gates. Use when planning a new
-  experiment, drafting or reviewing a spec, deciding between a new experiment
-  and a new iteration, folding off-spec decisions into a spec mid-loop, or
-  merging conclusions into knowledge.
+  experiment or a verifier change (a new metric, check script, or AI-review
+  checker), drafting or reviewing a spec, deciding between an experiment, a
+  verifier change, and a new iteration, folding off-spec decisions into a
+  spec mid-loop, or merging conclusions into knowledge.
 ---
 
 # Experiment Planning
@@ -17,24 +18,34 @@ verify against. The spec is the contract: verification (experiment-process
 skill) checks the implementation and the run against it, and any decision the
 spec does not dictate must eventually be folded back into it.
 
-## New experiment, new iteration, or engineering change?
+## Experiment, verifier change, or new iteration?
 
 Before planning, decide which you are doing:
 
-- The change carries **no hypothesis about model quality** —
-  instrumentation/metrics, refactoring, infrastructure, bootstrap
-  implementation → an **engineering change** (`ENG-NNNN`), not an experiment:
-  engineering log + reduced pipeline (experiment-logging and
-  experiment-process skills), no spec, no loop.
+- The change implements or modifies a **verification** — a metric plus how
+  to read it, a deterministic check script, an AI-review checker → a
+  **verifier change** (`VER-NNNN`). Same machinery as an experiment (spec,
+  loop, approval gates, knowledge merge), different run (see below).
 - The hypothesis or the declared diff scope **changes substantively** → a
   **new experiment** (new `EXP-NNNN`, new spec, parent set appropriately).
 - The implementation is being **fixed**, or the spec is being **enriched
   with details** → a **new iteration** of the same experiment (spec diff
   through the approval gate, iteration+1).
+- Small refactors and infra with none of the above → a **maintenance
+  commit**: no id, tree stays green, result-neutral ones pass the standing
+  `equivalence` verifier.
 
 When in doubt between experiment and iteration: if the new work would
 invalidate comparisons against the experiment's own earlier iterations, it
 is a new experiment.
+
+**Problems revealed by verifications spawn follow-up experiments, not
+revisions.** Verifications exist for gating *and* for analysis: when a
+verification shows the current experiment has a problem whose fix is a
+different improvement, conclude the current experiment with a terminal
+verdict and plan a **follow-up experiment** that closes the problem —
+recorded in the report's Follow-ups with the verification that surfaced it.
+`revise` is only for fixing this hypothesis's own implementation or spec.
 
 ## Writing the initial spec
 
@@ -60,12 +71,12 @@ experiment-logging skill) following these rules:
    - Root experiments pin `data` and `evaluation` absolutely and record the
      full training config; their diff may otherwise be empty.
 3. **Grounded assertions.** Every threshold traces to a real number — in a
-   `compare_to` record, or in the metric registry's `references`
-   (`knowledge/metrics.md`) for metrics backfilled after the reference run —
-   cited via `source`. Never invent absolute targets. Include non-regression
-   assertions (throughput, memory, secondary metrics) alongside the headline
-   claim. Prefer asserting on `primary` metrics; use `proxy` metrics for
-   analysis, not for accept/reject decisions.
+   `compare_to` record, or in the verification registry's `references`
+   (`knowledge/verifications.md`) for metrics backfilled after the reference
+   run — cited via `source`. Never invent absolute targets. Include
+   non-regression assertions (throughput, memory, secondary metrics)
+   alongside the headline claim. Prefer asserting on `primary` metrics; use
+   `proxy` metrics for analysis, not for accept/reject decisions.
 4. **Decision rule covering every outcome**: what result means `accept`,
    `reject`, `inconclusive`, and what failure modes mean `revise` — plus
    **early-kill thresholds** the training watchdog enforces (e.g. "kill if
@@ -124,31 +135,42 @@ Rules:
 If the executor disagrees with a verifier about what the spec should say,
 that is always a human escalation — never silently resolved by either agent.
 
-## Registering a new metric
+## Planning a verifier change
 
-Logging a new metric is **preparing a new verification** — a metric is
+Logging a new metric is **implementing a new verification** — a metric is
 logged either to measure experiment quality, to localize what to improve, or
-to watch training health, and each of those purposes implies a check.
-Adding or changing a metric is an engineering change (`ENG-NNNN`) with these
-extra obligations:
+to watch training health, and each of those purposes implies a check. The
+same holds for check scripts and AI-review checkers. A verifier change's
+spec follows all the rules above, plus the `verifier` frontmatter block:
 
-1. **Registry entry** in `knowledge/metrics.md`: `name`, `kind`, precise
-   `definition`, `logged_by`, `added_by`, and a `verification` mapping.
-   Defaults by kind:
-   - `primary` (measures experiment quality) → phase-4 **assertion** vs
-     `compare_to`;
-   - `proxy` (correlates with primary, localizes improvements) →
-     **advisory** check feeding analysis and anomaly triggers;
-   - `diagnostic` (training health: grad norm, loss by position, latent
-     std, perf) → phase-3 **band** or `analysis-only`.
-2. **Checker generation**: the checker agent derives the metric's check from
-   the registry entry (never from the executor's description).
-3. **Backfill**: measure the metric on the current reference checkpoint(s)
-   with an eval-only run and write the values into the entry's `references`
-   with provenance (experiment, checkpoint, measuring commit, date). Run
-   records are immutable — backfilled numbers live in the registry, never
-   patched into old records. If backfill is infeasible (metric requires
-   training-time state), record an explicit waiver in the entry instead.
+1. **What it verifies** (`verifier.verifies`): the property checked and what
+   a failure suggests — a fix in the current experiment, or a follow-up
+   experiment.
+2. **Type**: `deterministic-script`, `metric-observation`, or `ai-review`.
+   For metric observation, declare the metric's `kind` with its default
+   verification: `primary` → phase-4 assertion vs `compare_to`; `proxy` →
+   advisory check feeding analysis; `diagnostic` → phase-3 band or
+   analysis-only.
+3. **Calibration cases** (`verifier.calibration`): at least one known-good
+   case the finished verifier must pass and one known-bad case it must fail
+   (a planted bug, shuffled labels, an analytically known metric value).
+   A verifier that cannot fail verifies nothing.
+4. **Registry-entry draft** (`verifier.registry_entry`): the
+   `knowledge/verifications.md` entry to merge on acceptance.
+
+**Reference backfill.** For metric observations, measure reference values by
+running the repo's **standard eval command** (recorded in
+`knowledge/conventions.md`) on the frozen reference checkpoint(s) — no code
+changes, no baseline retraining. For through-training metrics, run it over
+all saved checkpoints of the reference run. Values go into the registry
+entry's `references` with provenance (experiment, checkpoint, measuring
+commit, date). Run records are immutable — backfilled numbers live in the
+registry, never patched into old records. Only if neither mechanism can
+produce the number, record an explicit waiver in the entry.
+
+On acceptance, the verification merges into `knowledge/verifications.md`
+and the checker agent generates its check from the registry entry (never
+from the executor's description).
 
 ## Merging into knowledge (terminal verdict)
 
@@ -158,6 +180,9 @@ On `accepted` / `rejected` / `inconclusive`:
    `knowledge/findings.md` — short entries, each linking its `EXP-NNNN`.
    Negative and inconclusive results are findings too.
 2. Update `knowledge/conventions.md` if the experiment changed repo-level
-   facts (new default config, new data version, revised budgets).
-3. The experiment folder stays archived as-is under `experiments/` —
-   knowledge holds conclusions, experiments hold provenance.
+   facts (new default config, new data version, revised budgets, a changed
+   standard eval command).
+3. For verifier changes: merge the `verifier.registry_entry` into
+   `knowledge/verifications.md` (with backfilled `references`).
+4. The change folder stays archived as-is under `experiments/` — knowledge
+   holds conclusions, the archive holds provenance.

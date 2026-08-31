@@ -5,9 +5,11 @@ description: >-
   experiment in an agent loop: verification phases 0-4 ordered by cost
   (deterministic checks first, AI review last), machine-readable check
   verdicts, iteration verdicts with a revise loop and spec-diff approval,
-  checker isolation, and resuming interrupted loops. Use when executing a
-  planned experiment, generating or running verification checks, monitoring
-  training, judging results, or continuing an interrupted experiment.
+  checker isolation, the verifier-change run (calibration, equivalence,
+  reference backfill), and resuming interrupted loops. Use when executing a
+  planned experiment or verifier change, generating or running verification
+  checks, monitoring training, judging results, or continuing an interrupted
+  loop.
 ---
 
 # Experiment Process
@@ -47,10 +49,11 @@ in minutes before burning a full run.
   (otherwise it optimizes for passing checks, not for correctness).
 - **Checker agent** — a separate agent (fresh context) that generates and
   maintains the deterministic checkers in `.harness/checkers/`, tailored to
-  this repo, guided by `references/checker-catalog.md`. Metric-backed checks
-  (phase-3 bands, phase-4 assertion inputs) are derived from the metric
-  registry `knowledge/metrics.md`, never invented. Checkers are versioned as
-  code; any checker diff itself goes through intent review.
+  this repo, guided by `references/checker-catalog.md`. Checks are derived
+  from the verification registry `knowledge/verifications.md` (phase-3
+  bands, phase-4 assertion inputs, calibration params), never invented.
+  Checkers are versioned as code; any checker diff itself goes through
+  intent review.
 - **Reviewers / diagnosticians** — isolated-context agents for spec review,
   code review, intent diff, failure diagnosis, and results review. Each gets
   only the inputs named for its check in the catalog, never the executor's
@@ -95,6 +98,12 @@ gate; warnings accumulate into the analysis; the AI diagnostician reads
 
 ## Iteration verdict
 
+Verification outputs are analysis inputs, not only gates: during analysis,
+read them as diagnosis. When a verification reveals a problem whose fix is a
+*different improvement* than this hypothesis, prefer a terminal verdict plus
+a follow-up experiment proposal (report's Follow-ups, citing the
+verification) over `revise` — see the experiment-planning boundary rule.
+
 After phase 4, set exactly one verdict in the iteration's record:
 
 - **accept** — decision rule satisfied → terminal `accepted`.
@@ -113,23 +122,24 @@ On any terminal verdict: write `report.md`, merge conclusions into
 `knowledge/` (experiment-planning skill), update the registry row, land docs
 on `main`, decide the code merge.
 
-## Engineering pipeline (no loop)
+## Verifier-change run
 
-Engineering changes (`ENG-NNNN` — no hypothesis about model quality; see the
-experiment-planning boundary rule) skip the experiment loop and run a
-reduced pipeline. Verdicts use the same JSON format and land in
-`experiments/engineering/ENG-NNNN/checks/`:
+Verifier changes (`VER-NNNN`) go through the same loop — statuses,
+iterations, spec-diff approval gates, verdicts in `runs/iNN/checks/` — but
+the iteration run is verifier calibration instead of model training. In
+place of phases 2–4:
 
-| Id | Check | Applies to |
+| Id | Check | Pass criterion |
 |---|---|---|
-| `e/static` | lint, typecheck, unit tests | all |
-| `e/scope` | files touched match the change's declared intent | all |
-| `e/smoke` | training smoke run completes | all |
-| `e/equivalence` | re-run smoke/eval at a reference checkpoint: previously registered metrics unchanged within tolerance | result-neutral changes (refactors, pure instrumentation) |
-| `e/metric-known-value` | unit check of the metric on inputs with a known value | new/changed metrics |
-| `e/metric-registered` | registry entry exists in `knowledge/metrics.md`, its checker is generated, references backfilled or waived | new/changed metrics |
+| `v/static` | lint, typecheck, unit tests | all pass |
+| `v/scope` | `git diff` ⊆ spec scope | holds |
+| `v/calibration` | run the verifier on the spec's calibration cases | passes every known-good case AND fails every known-bad case — a verifier that cannot fail verifies nothing |
+| `v/equivalence` | the standing `equivalence` verifier: re-run the unchanged training command for a few steps | loss, previously registered metrics, and artifacts identical within tolerance — implementing a verifier must not alter training |
+| `v/references` | metric observations only: reference values backfilled via the standard eval command on the frozen reference checkpoint(s) (all saved checkpoints for through-training metrics) | values recorded in the registry-entry draft with provenance, or waiver recorded |
 
-Mark the engineering-log row verified only when all applicable checks pass.
+Analysis and the iteration verdict follow the normal semantics; on
+acceptance the registry entry merges into `knowledge/verifications.md` and
+the checker agent generates the check from it.
 
 ## Resuming an interrupted loop
 
