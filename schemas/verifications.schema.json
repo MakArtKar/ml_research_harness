@@ -13,7 +13,7 @@
         "required": ["id", "type", "verifies"],
         "properties": {
           "id": {
-            "description": "Stable id, e.g. \"p2/single-batch-overfit\", \"equivalence\", \"metric/val-greedy-accepted-length\".",
+            "description": "Stable id, e.g. \"smoke/single-batch-overfit\", \"equivalence\", \"metric/val-greedy-accepted-length\".",
             "type": "string"
           },
           "type": {
@@ -24,7 +24,7 @@
             "type": "string"
           },
           "phase": {
-            "description": "Pipeline phase (0-4) where it runs, if phase-bound.",
+            "description": "Numeric stage code where it runs, if stage-bound: 0 = spec review, 1 = pre-run, 2 = smoke, 3 = watchdog, 4 = post-run.",
             "type": "integer",
             "minimum": 0,
             "maximum": 4

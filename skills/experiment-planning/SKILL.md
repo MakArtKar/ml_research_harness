@@ -158,10 +158,10 @@ spec follows all the rules above, plus the `verifier` frontmatter block:
    experiment.
 2. **Type**: `deterministic-script`, `metric-observation`, or `ai-review`.
    For metric observation, declare the metric's `kind`: `quality`
-   (assertable in phase 4 and advisory for analysis — whether it serves as a
+   (assertable post-run and advisory for analysis — whether it serves as a
    given experiment's primary or a proxy is chosen in *that experiment's*
    spec via `primary_metric`, never here) or `diagnostic` (training health →
-   phase-3 band or analysis-only).
+   watchdog band or analysis-only).
 3. **Calibration cases** (`verifier.calibration`): at least one known-good
    case the finished verifier must pass and one known-bad case it must fail
    (a planted bug, shuffled labels, an analytically known metric value).

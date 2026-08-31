@@ -33,7 +33,9 @@ verifications:
 Every verification available in this repo: deterministic scripts, AI-review
 checkers, and metric observations (a metric plus how to read it). Logging a
 new metric is implementing a new verification. The checker agent derives
-phase-3 bands and phase-4 assertion inputs from this file.
+watchdog bands and post-run assertion inputs from this file (the numeric
+`phase` field maps: 0 = spec review, 1 = pre-run, 2 = smoke, 3 = watchdog,
+4 = post-run).
 
 Verifications serve two purposes: **gating** the experiment loop, and
 **analysis** — a verification that reveals a problem in the current

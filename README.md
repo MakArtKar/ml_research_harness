@@ -31,8 +31,9 @@ hypothesis to validated knowledge.
   Changes are batched into one spec diff per iteration and approved by a
   human at the iteration boundary.
 - **Verification pyramid.** Checks are ordered strictly by cost across five
-  phases (before implementation → after implementation → first training
-  steps → during training → after training). Everything that can be a
+  named stages: **spec review** (before implementation) → **pre-run** (after
+  implementation) → **smoke** (first training steps) → **watchdog** (during
+  training) → **post-run** (after training). Everything that can be a
   deterministic check is one; AI review is reserved for what hard checks
   cannot express (spec review, intent diff, results interpretation). Every
   check emits a machine-readable verdict
@@ -68,7 +69,7 @@ skills/
   experiment-logging/     # where/what/how/when of experiment documentation
   experiment-planning/    # specs: hypotheses, generalized diffs, grounded
                           # assertions, living-spec maintenance
-  experiment-process/     # the loop: phases 0-4, verdicts, resumption
+  experiment-process/     # the loop: staged verification, verdicts, resumption
     references/
       checker-catalog.md  # full checker list with pass criteria
 schemas/                  # JSON Schemas for document frontmatter and verdicts
@@ -83,7 +84,7 @@ docs/
 |---|---|
 | [experiment-logging](skills/experiment-logging/SKILL.md) | Where records live (folders, branches, commit conventions), which fields go in which file, the dual format, and which fields must be complete at each status transition |
 | [experiment-planning](skills/experiment-planning/SKILL.md) | Writing specs: falsifiable hypotheses, diffs across all four axes, assertions grounded in recorded numbers, decision rules with early-kill thresholds, spec enrichment with human approval gates, knowledge merges |
-| [experiment-process](skills/experiment-process/SKILL.md) | Running the loop: verification phases 0–4, deterministic-first gating, check verdicts, iteration verdicts and the revise loop, checker isolation, resuming interrupted loops |
+| [experiment-process](skills/experiment-process/SKILL.md) | Running the loop: the named verification stages (spec review, pre-run, smoke, watchdog, post-run), deterministic-first gating, check verdicts, iteration verdicts and the revise loop, checker isolation, resuming interrupted loops |
 
 ## Using the harness
 
@@ -96,7 +97,7 @@ project (e.g. its `.claude/skills/`). Then:
    conventions filled by inspecting the repo, and (via a separate checker
    agent) `.harness/checkers/`.
 2. **Document the starting point** — a root experiment: setup pinned
-   absolutely, sanity assertions, phases 2–4 on unchanged code. Later
+   absolutely, sanity assertions, the training stages on unchanged code. Later
    experiments cite it in `compare_to`.
 3. **Plan** — draft a spec for your idea (planning skill), pass isolated
    spec review, sign off.

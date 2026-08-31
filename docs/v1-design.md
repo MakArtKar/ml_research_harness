@@ -93,7 +93,8 @@ an AI-review checker — is a **verifier change** (`VER-NNNN`). It uses the
 *same machinery* as an experiment: a living spec with approval gates, the
 agent loop with iterations, run records, a report, and an openspec-style
 merge into knowledge on acceptance. What differs is the run: instead of
-phases 2–4 (training), a verifier change runs **calibration** (the verifier
+the training stages (smoke, watchdog, post-run), a verifier change runs
+**calibration** (the verifier
 must pass known-good cases AND fail known-bad ones — a verifier that cannot
 fail verifies nothing), **equivalence** (implementing it must not alter
 training: unchanged command, few steps, identical loss/metrics/artifacts),
@@ -112,8 +113,8 @@ observations — the metric itself with its kind:
 
 | Metric kind | Purpose | Default verification |
 |---|---|---|
-| `quality` | measures an aspect of experiment quality or performance (acceptance length, TPF, tokens per second) | assertable in phase 4; advisory for analysis |
-| `diagnostic` | training health (grad norm, loss by position, latent std, perf internals) | phase-3 watchdog band or analysis-only |
+| `quality` | measures an aspect of experiment quality or performance (acceptance length, TPF, tokens per second) | assertable post-run; advisory for analysis |
+| `diagnostic` | training health (grad norm, loss by position, latent std, perf internals) | watchdog band or analysis-only |
 
 **The primary metric is chosen per experiment, never fixed globally.** Each
 experiment's spec declares `primary_metric` — the metric its success is
@@ -202,7 +203,7 @@ ml_research_harness/
 │   └── experiment-process/   # skill 3: how to run an experiment
 │       ├── SKILL.md
 │       └── references/
-│           └── checker-catalog.md   # full phase 0–4 checker list
+│           └── checker-catalog.md   # full checker list by stage
 ├── schemas/
 │   ├── spec.schema.json           # frontmatter of spec.md (EXP and VER)
 │   ├── record.schema.json         # frontmatter of a run record
@@ -330,7 +331,7 @@ How to produce and maintain a good `spec.md`.
   2.31 − 0.02 by step 10k", never absolute guesses. The skill requires
   reading those records first.
 - **Scoped diff**: allowlist of files and config keys the implementation may
-  touch. This is what phase-1 scope enforcement checks against. Checker and
+  touch. This is what pre-run scope enforcement checks against. Checker and
   experiment-doc directories are always outside the allowlist.
 - **Decision rule declared up front**: what result means accept, reject,
   inconclusive, or revise — including early-kill thresholds used during
@@ -350,19 +351,21 @@ scope before it goes to the human — the cheapest point for feedback.
 
 ### 4.3 Skill: `experiment-process` — running an experiment
 
-The verification pipeline, ordered strictly by cost (fail fast). Full checker
-catalog ships as `skills/experiment-process/references/checker-catalog.md`;
-summary:
+The verification pipeline, ordered strictly by cost (fail fast). Stages are
+**named** — spec review, pre-run, smoke, watchdog, post-run — and map to the
+numeric `phase` field 0–4 kept in machine-readable verdicts; human-readable
+documents use the names, never bare codes. Full checker catalog ships as
+`skills/experiment-process/references/checker-catalog.md`; summary:
 
-| Phase | Deterministic checks | AI review |
+| Stage (phase) | Deterministic checks | AI review |
 |---|---|---|
-| **0 — before implementation** | spec schema valid; parent and compare_to records exist with real numbers; clean env recorded | spec review (falsifiable, measurable, minimal scope) |
-| **1 — after implementation, before run** | lint/typecheck/tests; scope enforcement (`git diff` ⊆ allowlist); config diff vs parent touches only declared keys; data checks (train/val overlap, aug on train only, shapes); new component connectivity | ML-checklist code review; intent diff (implemented-vs-spec, isolated contexts, severity-calibrated) |
-| **2 — first training steps** | smoke run; loss-at-init sanity; loss decreases; NaN/Inf hooks; dead-param and grad-norm checks; single-batch overfit; reproducibility (same seed → same losses); shuffled-labels negative control; **short-horizon ablation sanity** (see below); throughput/memory in budget; checkpoint round-trip; eval-mode check | diagnosis only, on failure — never a gate |
-| **3 — during training** | watchdog: NaN, grad-norm band, loss spikes, LR schedule checkpoints, train/val gap, throughput/memory stability, heartbeat; early-kill rules from the spec | triggered on soft anomalies (plateaus, oscillations); advisory, gates only on critical |
-| **4 — after training** | artifact manifest satisfied and valid; all spec assertions evaluated vs compare_to; final checkpoint round-trip | results review → iteration verdict proposal; aggregation into a single machine verdict |
+| **spec review (0)** — before implementation | spec schema valid; parent and compare_to records exist with real numbers; clean env recorded | spec review (falsifiable, measurable, minimal scope) |
+| **pre-run (1)** — after implementation, before launch | lint/typecheck/tests; scope enforcement (`git diff` ⊆ allowlist); config diff vs parent touches only declared keys; data checks (train/val overlap, aug on train only, shapes); new component connectivity | ML-checklist code review; intent diff (implemented-vs-spec, isolated contexts, severity-calibrated) |
+| **smoke (2)** — first training steps | smoke run; loss-at-init sanity; loss decreases; NaN/Inf hooks; dead-param and grad-norm checks; single-batch overfit; reproducibility (same seed → same losses); shuffled-labels negative control; **short-horizon ablation sanity** (see below); throughput/memory in budget; checkpoint round-trip; eval-mode check | diagnosis only, on failure — never a gate |
+| **watchdog (3)** — during training | NaN, grad-norm band, loss spikes, LR schedule checkpoints, train/val gap, throughput/memory stability, heartbeat; early-kill rules from the spec | triggered on soft anomalies (plateaus, oscillations); advisory, gates only on critical |
+| **post-run (4)** — after training | artifact manifest satisfied and valid; all spec assertions evaluated vs compare_to; final checkpoint round-trip | results review → iteration verdict proposal; aggregation into a single machine verdict |
 
-**Short-horizon ablation sanity (phase 2).** When the diff adds a toggleable
+**Short-horizon ablation sanity (smoke stage).** When the diff adds a toggleable
 code component: run K steps with the component disabled — the curve must
 match the parent's (we didn't break the setup we started from); run K steps
 with it enabled — the curve must differ (the component is actually
@@ -372,7 +375,8 @@ run is never automatic — only on explicit request (e.g. before claiming a
 result in a paper).
 
 **Verifier-change run.** Verifier changes go through the same loop, but in
-place of phases 2–4: `v/static`, `v/scope`, `v/calibration` (pass every
+place of the smoke, watchdog, and post-run stages: `v/static`, `v/scope`,
+`v/calibration` (pass every
 known-good AND fail every known-bad case from the spec), `v/equivalence`
 (the standing verifier: unchanged command, few steps, identical
 loss/metrics/artifacts), `v/references` (backfill via the standard eval
@@ -406,8 +410,8 @@ paths), and generates the first set of repo-specific deterministic checkers.
 **S2 — Document the starting point.** User: "make current main our reference
 run". Agent writes a root-experiment spec (no parent; data, benchmarks,
 metrics, hyperparameters pinned absolutely; assertions = sanity only), runs
-phases 2–4 on unchanged code, fills the run record and report. Later
-experiments name it in `compare_to`.
+the smoke, watchdog, and post-run stages on unchanged code, fills the run
+record and report. Later experiments name it in `compare_to`.
 
 **S3 — Plan an experiment.** User describes an idea. Agent (planning skill)
 reads the parent's and compare_to records, drafts `spec.md` with grounded
@@ -415,8 +419,8 @@ assertions and a scoped generalized diff, requests spec review, gets user
 sign-off, sets `planned`, creates the `exp/` branch.
 
 **S4 — Run the loop.** Agent (process skill) implements within scope, passes
-phase 1, launches with phase 2 sanity gates, monitors via phase 3 watchdog,
-lands phase 4 checks; `runs/iNN/record.md` fills as the run progresses. On
+pre-run, launches through the smoke gates, monitors via the watchdog, lands
+the post-run checks; `runs/iNN/record.md` fills as the run progresses. On
 `revise`: the agent prepares the spec diff (material changes + assumptions),
 the human approves it, and iteration N+1 starts. Terminal verdicts exit to
 S5.
@@ -447,7 +451,7 @@ generated. The new metric/check is now usable by future specs and analyses.
 written first and doubles as the implementation contract; the codebase is
 built inside the root experiment's iteration 1 (commits `[EXP-0001.i1]`),
 kept green by static checks and smoke as it grows; then the root experiment
-pins the finished commit and runs phases 2–4 (S2). The first verifier
+pins the finished commit and runs the training stages (S2). The first verifier
 changes (the standing `equivalence` verifier, metric observations for
 whatever the code logs) follow immediately after.
 
@@ -459,9 +463,10 @@ whatever the code logs) follow immediately after.
   (`VER`) sharing the experiment machinery, the verification registry with
   metric-observation entries, and reference backfill via the standard eval
   command.
-- Checker catalog as a reference document; skills able to generate phase 0–2
-  deterministic checkers for a concrete repo (phases 3–4 may start as
-  documented procedures rather than generated code).
+- Checker catalog as a reference document; skills able to generate
+  deterministic checkers through the smoke stage for a concrete repo
+  (watchdog and post-run may start as documented procedures rather than
+  generated code).
 - End-to-end acceptance test: in a real repo (e.g. GDFlash), document one
   root experiment and one child experiment using only the skills — including
   at least one `revise` iteration with a spec-diff approval — every status
@@ -479,7 +484,7 @@ whatever the code logs) follow immediately after.
   final numbers manually.
 - Holdout/rotating verifier checks (anti-Goodhart hardening beyond checker
   isolation).
-- Full-length ablation runs (short-horizon ablation sanity in phase 2 covers
+- Full-length ablation runs (short-horizon ablation sanity in the smoke stage covers
   the automatic case).
 
 ## 7. Open questions

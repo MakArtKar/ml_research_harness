@@ -7,10 +7,11 @@
   "required": ["id", "phase", "verdict", "severity", "evidence"],
   "properties": {
     "id": {
-      "description": "Stable checker id, e.g. \"p2/single-batch-overfit\" (see the checker catalog).",
+      "description": "Stable checker id, e.g. \"smoke/single-batch-overfit\" (see the checker catalog).",
       "type": "string"
     },
     "phase": {
+      "description": "Numeric stage code: 0 = spec review, 1 = pre-run, 2 = smoke, 3 = watchdog, 4 = post-run. Human-readable documents use the stage names.",
       "type": "integer",
       "minimum": 0,
       "maximum": 4
